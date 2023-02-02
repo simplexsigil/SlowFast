@@ -270,7 +270,7 @@ def torchvision_decode(
         decode_all_video (bool): if True, the entire video was decoded.
     """
     # Convert the bytes to a tensor.
-    video_tensor = torch.from_numpy(np.frombuffer(video_handle, dtype=np.uint8))
+    video_tensor = torch.from_numpy(np.array(np.frombuffer(video_handle, dtype=np.uint8), copy=True))
 
     decode_all_video = True
     video_start_pts, video_end_pts = 0, -1
@@ -522,6 +522,9 @@ def decode(
                 use_offset=use_offset,
             )
         elif backend == "torchvision":
+            if len(container) == 0:
+                raise Exception("Empty file")
+
             (
                 frames_decoded,
                 fps,
@@ -550,7 +553,7 @@ def decode(
         return None, None, None
 
     # Return None if the frames was not decoded successfully.
-    if frames_decoded is None or None in frames_decoded:
+    if frames_decoded is None: # or None in frames_decoded:
         return None, None, None
 
     if not isinstance(frames_decoded, list):

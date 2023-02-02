@@ -265,6 +265,8 @@ _C.TEST.ENABLE = True
 # Dataset for testing.
 _C.TEST.DATASET = "kinetics"
 
+_C.TEST.ACCEPT_MISSING = False
+
 # Total mini-batch size
 _C.TEST.BATCH_SIZE = 8
 
