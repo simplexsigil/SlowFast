@@ -30,9 +30,12 @@ def get_label_indices(label_indices_path):
     return {k: v for v, k in enumerate(natsort.natsorted(list(raw_labels)))}, {k: v for v, k in enumerate(label_indices["category"].values)}
 
 
-def get_path_mappings(base_path, samples_path):
-    files = glob.glob(samples_path, recursive=True)
-    return {os.path.join(*os.path.normpath(p).split(os.path.sep)[-4:-1]): p.removeprefix(base_path) for p in files}
+def get_path_mappings(base_path, pattern="**/sequence_*"):
+    glob_pattern = os.path.join(base_path, pattern)
+    print(f"Glob pattern: {glob_pattern}")
+    files = glob.glob(glob_pattern, recursive=True)
+    print(len(files))
+    return {os.path.join(*os.path.normpath(p).split(os.path.sep)[-4:-1]): p.removeprefix(base_path) for p in files}, {p.removeprefix(base_path): os.path.join(*os.path.normpath(p).split(os.path.sep)[-4:-1]) for p in files}
 
 
 def get_anns(babel_file_path):
@@ -55,7 +58,7 @@ def main():
                         default=os.path.expandvars("$LSDF/data/activity/BABEL/category_index.csv"),
                         help="Path to label indices")
     parser.add_argument("--base_path", type=str,
-                        default=os.path.expanduser("$LSDF/data/activity/AMARV/run4_2023_01_27/"),
+                        default=os.path.expandvars("$LSDF/data/activity/AMARV/run4_2023_01_27/"),
                         help="Path to base directory")
     parser.add_argument("--output", type=str, default=None, help="Output file name")
     parser.add_argument('--save_index_files', action=argparse.BooleanOptionalAction)
@@ -69,8 +72,6 @@ def main():
     raw_act_indices, act_cat_indices = get_label_indices(args.label_indices)
 
     if args.save_index_files:
-        import csv
-
         with open('act_cat_indices.csv', 'w') as f:
             w = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             for row in act_cat_indices.items():
@@ -82,25 +83,30 @@ def main():
                 w.writerow(row)
 
 
-    path_mappings = get_path_mappings(args.base_path, args.base_path)
+    _, path_mappings = get_path_mappings(args.base_path)
+    print(f"Found {len(path_mappings)} paths in {args.base_path}.")
+
     anns = get_anns(args.babel_file)
+    print(f"Found {len(anns)} annotations.")
 
     num_lines = 0
     with open(args.output, 'w') as csvfile:
         writer = csv.writer(csvfile, delimiter=',', quotechar="'", quoting=csv.QUOTE_MINIMAL)
 
-        for sam, (segs, dur) in anns.items():
-            if sam in path_mappings:
+        for path, sam in path_mappings.items():
+            if sam in anns:
+                segs,dur = anns[sam]
                 for seg in segs:
-                    action_cat_indices = [str(act_cat_indices[a]) for a in seg["act_cat"]]
-                    raw_cat_index = raw_act_indices[seg["proc_label"]]
-                    line = [path_mappings[sam], sam, ";".join(action_cat_indices), ";".join(seg["act_cat"]),
+                    action_cat_indices = [str(act_cat_indices[a]) for a in seg["act_cat"]]  if seg["act_cat"] is not None else ["-1",]
+                    raw_cat_index = raw_act_indices[' '.join(seg["proc_label"].split())] if seg["proc_label"] is not None else "-1"
+                    
+                    line = [path_mappings[path], sam, ";".join(action_cat_indices), ";".join(seg["act_cat"]) if seg["act_cat"] else "None",
                             raw_cat_index, seg["proc_label"],
                             str(seg["start_t"]), str(seg["end_t"]), str(dur)]
                     writer.writerow(line)
-                    num_lines += 1
-
-    print(f"Wrote {num_lines} lines.")
+                num_lines += 1
+    print(f"Wrote {num_lines} paths with annotations.")
+    print(f"There are {len(path_mappings) - num_lines} paths without annotations.")
 
 
 if __name__ == "__main__":
