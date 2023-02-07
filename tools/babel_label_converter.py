@@ -4,28 +4,8 @@ import os
 import csv
 import pandas as pd
 import argparse
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--babel_file", type=str, default="/lsdf/data/activity/BABEL/babel_v1-0_release/train.json", help="Path to babel file")
-parser.add_argument("--label_indices", type=str, default="/lsdf/data/activity/BABEL/category_index.csv", help="Path to label indices")
-parser.add_argument("--base_path", type=str, default="/lsdf/data/activity/AMARV/run4_2023_01_27/", help="Path to base directory")
-parser.add_argument("--output", type=str, default=None, help="Output file name")
-
-args = parser.parse_args()
-
-if args.output is None:
-    args.output = os.path.splitext(os.path.split(args.babel_file)[1])[0] + ".csv"
-    print(f"No output path provided, using: {args.output}")
-
-label_indices = pd.read_csv(args.label_indices, sep="#")
-label_indices = {k: v for v, k in enumerate(label_indices["category"].values)}
-
-with open(args.babel_file, "r") as bf:
-    bab = json.load(bf)
-
-samples = glob.glob(os.path.join(args.base_path, '**/sequence_*'), recursive=True)
-path_mappings = {os.path.join(*os.path.normpath(p).split(os.path.sep)[-4:-1]): p.removeprefix(args.base_path) for p in
-                 samples}
+import re
+import natsort
 
 
 def extract_label_and_set_times(sample):
@@ -39,20 +19,89 @@ def extract_label_and_set_times(sample):
         return labels, sample["dur"]
 
 
-anns = {os.path.join(*os.path.normpath(b["feat_p"][:-10]).split(os.path.sep)[1:]): extract_label_and_set_times(b) for b
-        in bab.values()}
+def get_label_indices(label_indices_path):
+    raw_labels = set()
+    label_indices = pd.read_csv(label_indices_path, sep="#")
 
-num_lines = 0
-with open(args.output, 'w') as csvfile:
-    writer = csv.writer(csvfile, delimiter=',', quotechar="'", quoting=csv.QUOTE_MINIMAL)
+    for rls in label_indices["raw_labels"]:
+        rls = [rl.strip() for rl in rls.split(",")]
+        raw_labels.update(rls)
 
-    for sam, (segs, dur) in anns.items():
-        if sam in path_mappings:
-            for seg in segs:
-                action_cat_indices = [str(label_indices[a]) for a in seg["act_cat"]]
-                line = [path_mappings[sam], sam, ";".join(action_cat_indices), ";".join(seg["act_cat"]), seg["proc_label"],
-                     str(seg["start_t"]), str(seg["end_t"]), str(dur)]
-                writer.writerow(line)
-                num_lines += 1
+    return {k: v for v, k in enumerate(natsort.natsorted(list(raw_labels)))}, {k: v for v, k in enumerate(label_indices["category"].values)}
 
-print(f"Wrote {num_lines} lines.")
+
+def get_path_mappings(base_path, samples_path):
+    files = glob.glob(samples_path, recursive=True)
+    return {os.path.join(*os.path.normpath(p).split(os.path.sep)[-4:-1]): p.removeprefix(base_path) for p in files}
+
+
+def get_anns(babel_file_path):
+    with open(babel_file_path, "r") as bf:
+        babel_data = json.load(bf)
+
+    anns = {os.path.join(*os.path.normpath(b["feat_p"][:-10]).split(os.path.sep)[1:]): extract_label_and_set_times(b)
+            for b
+            in babel_data.values()}
+
+    return anns
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--babel_file", type=str,
+                        default=os.path.expandvars("$LSDF/data/activity/BABEL/babel_v1-0_release/train.json"),
+                        help="Path to babel file")
+    parser.add_argument("--label_indices", type=str,
+                        default=os.path.expandvars("$LSDF/data/activity/BABEL/category_index.csv"),
+                        help="Path to label indices")
+    parser.add_argument("--base_path", type=str,
+                        default=os.path.expanduser("$LSDF/data/activity/AMARV/run4_2023_01_27/"),
+                        help="Path to base directory")
+    parser.add_argument("--output", type=str, default=None, help="Output file name")
+    parser.add_argument('--save_index_files', action=argparse.BooleanOptionalAction)
+
+    args = parser.parse_args()
+
+    if args.output is None:
+        args.output = os.path.splitext(os.path.split(args.babel_file)[1])[0] + ".csv"
+        print(f"No output path provided, using: {args.output}")
+
+    raw_act_indices, act_cat_indices = get_label_indices(args.label_indices)
+
+    if args.save_index_files:
+        import csv
+
+        with open('act_cat_indices.csv', 'w') as f:
+            w = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            for row in act_cat_indices.items():
+                w.writerow(row)
+
+        with open('raw_act_indices.csv', 'w') as f:
+            w = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            for row in raw_act_indices.items():
+                w.writerow(row)
+
+
+    path_mappings = get_path_mappings(args.base_path, args.base_path)
+    anns = get_anns(args.babel_file)
+
+    num_lines = 0
+    with open(args.output, 'w') as csvfile:
+        writer = csv.writer(csvfile, delimiter=',', quotechar="'", quoting=csv.QUOTE_MINIMAL)
+
+        for sam, (segs, dur) in anns.items():
+            if sam in path_mappings:
+                for seg in segs:
+                    action_cat_indices = [str(act_cat_indices[a]) for a in seg["act_cat"]]
+                    raw_cat_index = raw_act_indices[seg["proc_label"]]
+                    line = [path_mappings[sam], sam, ";".join(action_cat_indices), ";".join(seg["act_cat"]),
+                            raw_cat_index, seg["proc_label"],
+                            str(seg["start_t"]), str(seg["end_t"]), str(dur)]
+                    writer.writerow(line)
+                    num_lines += 1
+
+    print(f"Wrote {num_lines} lines.")
+
+
+if __name__ == "__main__":
+    main()
