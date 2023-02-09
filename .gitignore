@@ -1,7 +1,9 @@
+cache
 *.csv
 build
 __pycache__
 .idea
 checkpoints
+old_checkpoints
 *.log
 *.egg-info
