@@ -31,6 +31,7 @@ logger = logging.get_logger(__name__)
 
 import matplotlib.pyplot as plt
 
+
 def histogram_time_durations(time_durations, bin_size=0.2, max_time=5.0):
     time_durations = [td[1] - td[0] for td in time_durations]
     bins = np.arange(0, max_time + bin_size, bin_size)
@@ -41,6 +42,7 @@ def histogram_time_durations(time_durations, bin_size=0.2, max_time=5.0):
     plt.ylabel('Count')
     plt.title('Histogram of Time Durations')
     plt.show()
+
 
 @DATASET_REGISTRY.register()
 class Amarv(torch.utils.data.Dataset):
@@ -148,6 +150,7 @@ class Amarv(torch.utils.data.Dataset):
                 os.sep) else self.cfg.DATA.PATH_PREFIX)[1]
 
             path_cache_file = os.path.join('cache', path_cache_file + ".pkl")
+            os.makedirs("cache", exist_ok=True)
 
             if not os.path.exists(path_cache_file):
                 existing_sequence_paths = glob.glob(os.path.join(self.cfg.DATA.PATH_PREFIX, "**/sequence_*"),
