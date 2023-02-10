@@ -7,6 +7,9 @@ import math
 import numpy as np
 import pprint
 import torch
+import warnings
+warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._functional_video.*")
+
 from fvcore.nn.precise_bn import get_bn_modules, update_bn_stats
 
 import slowfast.models.losses as losses
