@@ -11,6 +11,10 @@ import pandas
 import torch
 import torch.utils.data
 import tqdm
+
+import warnings
+warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._functional_video.*")
+
 from torchvision import transforms
 
 import slowfast.utils.logging as logging
