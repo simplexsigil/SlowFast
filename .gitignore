@@ -1,3 +1,4 @@
+ext_checkpoints/*
 runs-AMARV
 experiments/*
 cache/*
