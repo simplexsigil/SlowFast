@@ -4,7 +4,8 @@
 """Video models."""
 
 import math
-from functools import partial
+from functools import partial, reduce
+import operator
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -881,7 +882,8 @@ class MViT(nn.Module):
             self.input_dims[i] // self.patch_stride[i]
             for i in range(len(self.input_dims))
         ]
-        num_patches = math.prod(self.patch_dims)
+        # num_patches = math.prod(self.patch_dims)
+        num_patches = reduce(operator.mul, self.patch_dims, 1)  # compatibility for python 3.7
 
         dpr = [
             x.item() for x in torch.linspace(0, drop_path_rate, depth)

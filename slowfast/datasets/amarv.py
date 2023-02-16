@@ -194,6 +194,11 @@ class Amarv(torch.utils.data.Dataset):
                             )
                         )
 
+                # for local debugging
+                if path not in self._sequence_path_map:
+                    logger.debug(f'No {path} found.')
+                    continue
+
                 for sequence_dir in self._sequence_path_map[path]:
                     for idx in range(self._num_clips):
                         self._path_to_sequence.append(os.path.join(self.cfg.DATA.PATH_PREFIX, sequence_dir))
