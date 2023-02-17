@@ -9,7 +9,7 @@ TRAIN:
 DATA:
   PATH_TO_DATA_DIR: /hkfs/work/workspace/scratch/kf3609-datasets/AMARV/annotations/run4_2023_01_27
   PATH_PREFIX: /hkfs/work/workspace/scratch/kf3609-datasets/AMARV/run4_2023_01_27/
-  DATA.PATH_LABEL_SEPARATOR: ","
+  PATH_LABEL_SEPARATOR: ","
   NUM_FRAMES: 8
   SAMPLING_RATE: 8
   TRAIN_JITTER_SCALES: [256, 320]

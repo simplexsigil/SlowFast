@@ -1,4 +1,8 @@
-cache
+ext_checkpoints/*
+runs-AMARV
+experiments/*
+cache/*
+*.csv
 build
 __pycache__
 .idea
