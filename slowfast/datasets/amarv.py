@@ -135,7 +135,8 @@ class Amarv(torch.utils.data.Dataset):
 
         self._path_to_sequence: List[str] = []
 
-        self._labels = []
+        self._labels_proc = []
+        self._labels_cats = []
         self._spatial_temporal_idx = []
         self._clip_boundaries = []
         self._video_duration = []
@@ -195,15 +196,23 @@ class Amarv(torch.utils.data.Dataset):
                             )
                         )
 
-                for sequence_dir in self._sequence_path_map[path]:
-                    for idx in range(self._num_clips):
-                        self._path_to_sequence.append(os.path.join(self.cfg.DATA.PATH_PREFIX, sequence_dir))
+                def add_row(sequence_dir, clip_index, act, act_cat, t_start, t_stop, dur):
+                    self._path_to_sequence.append(os.path.join(self.cfg.DATA.PATH_PREFIX, sequence_dir))
 
-                        self._labels.append(int(act))
-                        self._spatial_temporal_idx.append(idx)
-                        self._clip_boundaries.append((float(t_start), float(t_stop)))
-                        self._video_duration.append(float(dur))
-                        self._video_meta.append({})
+                    self._labels_proc.append(int(act))
+                    self._labels_cats.append(act_cat)
+                    self._spatial_temporal_idx.append(clip_index)
+                    self._clip_boundaries.append((float(t_start), float(t_stop)))
+                    self._video_duration.append(float(dur))
+                    self._video_meta.append({})
+
+                for sequence_dir in self._sequence_path_map[path]:
+                    act_cats = list(int(c) for c in act_cats.split(";"))
+                    for act_cat in act_cats:
+                        for idx in range(self._num_clips):
+                            add_row(sequence_dir, idx, act, act_cat, t_start, t_stop, dur)
+
+
         assert (
                 len(self._path_to_sequence) > 0
         ), "Failed to load Amarv split {} from {}".format(
@@ -459,7 +468,7 @@ class Amarv(torch.utils.data.Dataset):
             num_out = num_aug * num_decode
             f_out, time_idx_out = [None] * num_out, [None] * num_out
             idx = -1
-            label = self._labels[index]
+            label = self._labels_proc[index]
 
             for i in range(num_decode):
                 for _ in range(num_aug):
