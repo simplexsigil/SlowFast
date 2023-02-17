@@ -10,6 +10,7 @@ import os
 import pickle
 from collections import OrderedDict
 import torch
+from typing import List
 
 import slowfast.utils.distributed as du
 import slowfast.utils.logging as logging
@@ -738,3 +739,17 @@ def load_train_checkpoint(cfg, model, optimizer, scaler=None):
         start_epoch = 0
 
     return start_epoch
+
+
+def load_and_broadcast_checkpoint_list(
+    checkpoint_paths: List[str], device: torch.device = torch.device("cpu")
+):
+    if du.is_root_proc():
+        for path in checkpoint_paths:
+            checkpoint = load_checkpoint(path, device)
+            if checkpoint is not None:
+                break
+    else:
+        checkpoint = None
+    logging.info(f"Broadcasting checkpoint loaded from {checkpoint_paths}")
+    return du.broadcast_object(checkpoint)

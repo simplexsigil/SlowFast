@@ -8,6 +8,9 @@ import logging
 import pickle
 import torch
 import torch.distributed as dist
+import io
+import tempfile
+from typing import Tuple
 
 from pytorchvideo.layers.distributed import (  # noqa
     cat_all_gather,
@@ -307,3 +310,89 @@ class AllGatherWithGradient(torch.autograd.Function):
             cur_gpu * mini_batchsize : (cur_gpu + 1) * mini_batchsize
         ]
         return grad_output
+
+
+def is_distributed_training_run() -> bool:
+    return (
+        torch.distributed.is_available()
+        and torch.distributed.is_initialized()
+        and (torch.distributed.get_world_size() > 1)
+    )
+
+
+def convert_to_distributed_tensor(tensor: torch.Tensor) -> Tuple[torch.Tensor, str]:
+    """
+    For some backends, such as NCCL, communication only works if the
+    tensor is on the GPU. This helper function converts to the correct
+    device and returns the tensor + original device.
+    """
+    orig_device = "cpu" if not tensor.is_cuda else "gpu"
+    if (
+        torch.distributed.is_available()
+        and torch.distributed.get_backend() == torch.distributed.Backend.NCCL
+        and not tensor.is_cuda
+    ):
+        tensor = tensor.cuda()
+    return (tensor, orig_device)
+
+
+def convert_to_normal_tensor(tensor: torch.Tensor, orig_device: str) -> torch.Tensor:
+    """
+    For some backends, such as NCCL, communication only works if the
+    tensor is on the GPU. This converts the tensor back to original device.
+    """
+    if tensor.is_cuda and orig_device == "cpu":
+        tensor = tensor.cpu()
+    return tensor
+
+
+def broadcast(tensor: torch.Tensor, src: int = 0) -> torch.Tensor:
+    """
+    Wrapper over torch.distributed.broadcast for broadcasting a tensor from the source
+    to all processes in both distributed / non-distributed scenarios.
+    """
+    if is_distributed_training_run():
+        tensor, orig_device = convert_to_distributed_tensor(tensor)
+        torch.distributed.broadcast(tensor, src)
+        tensor = convert_to_normal_tensor(tensor, orig_device)
+    return tensor
+
+
+def broadcast_object(obj, src: int = 0, use_disk: bool = True):
+    """Broadcast an object from a source to all workers.
+
+    Args:
+        obj: Object to broadcast, must be serializable
+        src: Source rank for broadcast (default is primary)
+        use_disk: If enabled, removes redundant CPU memory copies by writing to
+            disk
+    """
+    # Either broadcast from primary to the fleet (default),
+    # or use the src setting as the original rank
+    if get_rank() == src:
+        # Emit data
+        buffer = io.BytesIO()
+        torch.save(obj, buffer)
+        data_view = buffer.getbuffer()
+        length_tensor = torch.LongTensor([len(data_view)])
+        length_tensor = broadcast(length_tensor, src=src)
+        data_tensor = torch.ByteTensor(data_view)
+        data_tensor = broadcast(data_tensor, src=src)
+    else:
+        # Fetch from the source
+        length_tensor = torch.LongTensor([0])
+        length_tensor = broadcast(length_tensor, src=src)
+        data_tensor = torch.empty([length_tensor.item()], dtype=torch.uint8)
+        data_tensor = broadcast(data_tensor, src=src)
+        if use_disk:
+            with tempfile.TemporaryFile("r+b") as f:
+                f.write(data_tensor.numpy())
+                # remove reference to the data tensor and hope that Python garbage
+                # collects it
+                del data_tensor
+                f.seek(0)
+                obj = torch.load(f)
+        else:
+            buffer = io.BytesIO(data_tensor.numpy())
+            obj = torch.load(buffer)
+    return obj
