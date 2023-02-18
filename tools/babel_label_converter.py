@@ -32,11 +32,20 @@ def get_label_indices(label_indices_path):
         label_indices["category"].values)}
 
 
-def get_path_mappings(base_path, pattern="**/sequence_*"):
-    glob_pattern = os.path.join(base_path, pattern)
-    print(f"Glob pattern: {glob_pattern}")
-    files = glob.glob(glob_pattern, recursive=True)
-    print(len(files))
+def get_path_mappings(base_path, pattern="**/sequence_*", path_file=None):
+    if path_file is not None and os.path.exists(path_file): 
+        with open(path_file, "r") as f:
+            files = json.load(f)
+    else:
+        glob_pattern = os.path.join(base_path, pattern)
+        print(f"Glob pattern: {glob_pattern}")
+        files = glob.glob(glob_pattern, recursive=True)
+        print(len(files))
+
+        if path_file:
+            with open(path_file, "w") as f:
+                json.dump(files, f)
+                
     return {os.path.join(*os.path.normpath(p).split(os.path.sep)[-4:-1]):
                 p.removeprefix(base_path).replace("_", "").replace(" ", "")
             for p in files}, \
@@ -82,6 +91,9 @@ def main():
     parser.add_argument("--base_path", type=str,
                         default=os.path.expandvars("$LSDF/data/activity/AMARV/run4_2023_02_11/"),
                         help="Path to base directory")
+    parser.add_argument("--path_file", type=str,
+                        default=None,
+                        help="Cache file to avoid searching file system.")
     parser.add_argument("--output_directory", type=str, default=None, help="Output file name")
     parser.add_argument('--save_index_files', action=argparse.BooleanOptionalAction)
 
@@ -126,7 +138,7 @@ def main():
 
     print(f"{len(all_anns)} annotations in total.")
 
-    _, path_mappings = get_path_mappings(args.base_path)
+    _, path_mappings = get_path_mappings(args.base_path, path_file=args.path_file)
     print(f"Found {len(path_mappings)} paths in {args.base_path}.")
     pd.DataFrame.from_records(list(path_mappings.items())).to_csv("paths.csv", header=False, index=False)
 
@@ -137,8 +149,8 @@ def main():
             i += 1
     print(f"{i} paths without annotations (and potentially more sequences).")
 
-    bcc = {k: 0 for k in babel_top_150_index.values()}  # babel challenge counter
-    acc = {k: 0 for k in raw_act_indices.values()}  # action cat counter
+    bcc = {k: 0 for k in babel_top_150_index.keys()}  # babel challenge counter
+    acc = {k: 0 for k in raw_act_indices.keys()}  # action cat counter
 
     for anns, outfile in zip([train_anns, val_anns, test_anns], ["train.csv", "val.csv", "test.csv"]):
         num_lines = 0
