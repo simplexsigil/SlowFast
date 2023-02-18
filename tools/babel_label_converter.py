@@ -7,7 +7,7 @@ import argparse
 import re
 import natsort
 from babel_120_60_label_to_index import label_to_index as babel_top_150_index
-
+import pprint
 
 def extract_label_and_set_times(sample):
     if sample["frame_ann"]:
@@ -137,6 +137,9 @@ def main():
             i += 1
     print(f"{i} paths without annotations (and potentially more sequences).")
 
+    bcc = {k: 0 for k in babel_top_150_index.values()}  # babel challenge counter
+    acc = {k: 0 for k in raw_act_indices.values()}  # action cat counter
+
     for anns, outfile in zip([train_anns, val_anns, test_anns], ["train.csv", "val.csv", "test.csv"]):
         num_lines = 0
         with open(os.path.join(args.output_directory, outfile), 'w') as csvfile:
@@ -146,6 +149,11 @@ def main():
                 if sam in anns:
                     segs, dur = anns[sam]
                     for seg in segs:
+                        if seg["act_cat"] is not None:
+                            for a in seg["act_cat"]:
+                                if a in babel_top_150_index: bcc[a] += 1
+                                if a in acc: acc[a] += 1
+
                         action_cats = [str(act_cat_indices[a]) for a in seg["act_cat"]] \
                             if seg["act_cat"] is not None else ["-1", ]
 
@@ -166,6 +174,8 @@ def main():
 
         print(f"Wrote {num_lines} paths with annotations in {outfile}")
 
+        print(json.dumps(bcc, indent=4))
+        print(json.dumps(acc, indent=4))
 
 if __name__ == "__main__":
     main()
