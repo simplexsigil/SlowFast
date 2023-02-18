@@ -6,6 +6,7 @@ import pandas as pd
 import argparse
 import re
 import natsort
+from babel_120_60_label_to_index import label_to_index as babel_top_150_index
 
 
 def extract_label_and_set_times(sample):
@@ -79,7 +80,7 @@ def main():
                         default=os.path.expandvars("$LSDF/data/activity/BABEL/category_index.csv"),
                         help="Path to label indices")
     parser.add_argument("--base_path", type=str,
-                        default=os.path.expandvars("$LSDF/data/activity/AMARV/run4_2023_01_27/"),
+                        default=os.path.expandvars("$LSDF/data/activity/AMARV/run4_2023_02_11/"),
                         help="Path to base directory")
     parser.add_argument("--output_directory", type=str, default=None, help="Output file name")
     parser.add_argument('--save_index_files', action=argparse.BooleanOptionalAction)
@@ -93,14 +94,19 @@ def main():
     raw_act_indices, act_cat_indices = get_label_indices(args.label_indices)
 
     if args.save_index_files:
-        with open(os.path.join(args.output_directory, 'act_cat_indices.csv'), 'w') as f:
+        with open(os.path.join(args.output_directory, 'act_cat_indices_new.csv'), 'w') as f:
             w = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             for row in act_cat_indices.items():
                 w.writerow(row)
 
-        with open(os.path.join(args.output_directory, 'raw_act_indices.csv'), 'w') as f:
+        with open(os.path.join(args.output_directory, 'raw_act_indices_new.csv'), 'w') as f:
             w = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             for row in raw_act_indices.items():
+                w.writerow(row)
+
+        with open(os.path.join(args.output_directory, 'babel_challenge_indices.csv'), 'w') as f:
+            w = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            for row in babel_top_150_index.items():
                 w.writerow(row)
 
     train_anns = get_anns(os.path.join(args.babel_root, "train.json"))
@@ -140,15 +146,20 @@ def main():
                 if sam in anns:
                     segs, dur = anns[sam]
                     for seg in segs:
-                        action_cat_indices = [str(act_cat_indices[a]) for a in seg["act_cat"]] if seg[
-                                                                                                      "act_cat"] is not None else [
-                            "-1", ]
-                        raw_cat_index = raw_act_indices[' '.join(seg["proc_label"].split())] if seg[
-                                                                                                    "proc_label"] is not None else "-1"
+                        action_cats = [str(act_cat_indices[a]) for a in seg["act_cat"]] \
+                            if seg["act_cat"] is not None else ["-1", ]
 
-                        line = [path, ";".join(action_cat_indices),
+                        babel_challenge_cats = [str(babel_top_150_index[a]) if a in babel_top_150_index else "-1" \
+                                                for a in seg["act_cat"]] \
+                            if seg["act_cat"] is not None \
+                            else ["-1", ]
+
+                        raw_cat = raw_act_indices[' '.join(seg["proc_label"].split())] \
+                            if seg["proc_label"] is not None else "-1"
+
+                        line = [path, ";".join(action_cats), ";".join(babel_challenge_cats),
                                 ";".join(seg["act_cat"]) if seg["act_cat"] else "None",
-                                raw_cat_index, seg["proc_label"] if seg["proc_label"] else "None",
+                                raw_cat, seg["proc_label"] if seg["proc_label"] else "None",
                                 str(seg["start_t"]), str(seg["end_t"]), str(dur)]
                         writer.writerow(line)
                     num_lines += 1
