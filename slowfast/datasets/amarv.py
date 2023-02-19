@@ -150,7 +150,7 @@ class Amarv(torch.utils.data.Dataset):
 
         with pathmgr.open(path_to_file, "r") as f:
             print(f"Loading data for {path_to_file}")
-        
+
             if self.use_chunk_loading:
                 rows = self._get_chunk(f, self.cfg.DATA.LOADER_CHUNK_SIZE)
             else:
@@ -159,7 +159,7 @@ class Amarv(torch.utils.data.Dataset):
             data_paths = self.cfg.DATA.PATH_PREFIX.split(";")
 
             print(f"Looking for sequences in {data_paths}")
-            
+
             self._sequence_path_map = {}
             sequence_path_maps = []
 
@@ -412,12 +412,12 @@ class Amarv(torch.utils.data.Dataset):
                 )
 
             # for i in range(num_decode):
-            num_frames = np.array([self.cfg.DATA.NUM_FRAMES])
+            num_frames = [self.cfg.DATA.NUM_FRAMES]
             sampling_rate = np.array(utils.get_random_sampling_rate(
                 self.cfg.MULTIGRID.LONG_CYCLE_SAMPLING_RATE,
                 self.cfg.DATA.SAMPLING_RATE,
                 ))
-            sampling_rate = np.array([sampling_rate])
+            sampling_rate = [sampling_rate]
             if len(num_frames) < num_decode:
                 num_frames.extend(
                     [
@@ -449,6 +449,9 @@ class Amarv(torch.utils.data.Dataset):
                 target_fps += random.uniform(
                     0.0, self.cfg.DATA.TRAIN_JITTER_FPS
                     )
+
+            sampling_rate = np.array(sampling_rate)
+            num_frames = np.array(num_frames)
 
             # Decode video. Meta info is used to perform selective decoding.
             frames, time_idx, tdiff = decoder.decode(
