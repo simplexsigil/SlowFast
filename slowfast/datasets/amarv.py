@@ -149,6 +149,8 @@ class Amarv(torch.utils.data.Dataset):
         self.skip_rows = self.cfg.DATA.SKIP_ROWS
 
         with pathmgr.open(path_to_file, "r") as f:
+            print(f"Loading data for {path_to_file}")
+        
             if self.use_chunk_loading:
                 rows = self._get_chunk(f, self.cfg.DATA.LOADER_CHUNK_SIZE)
             else:
@@ -156,6 +158,8 @@ class Amarv(torch.utils.data.Dataset):
 
             data_paths = self.cfg.DATA.PATH_PREFIX.split(";")
 
+            print(f"Looking for sequences in {data_paths}")
+            
             self._sequence_path_map = {}
             sequence_path_maps = []
 
@@ -180,6 +184,8 @@ class Amarv(torch.utils.data.Dataset):
 
                     if len(existing_sequence_paths) == 0:
                         print(f"Warning: not a single sequence found for path {dp}")
+
+                print(f"Found {len(existing_sequence_paths)} sequences in {dp}")
 
                 spm = {}
 

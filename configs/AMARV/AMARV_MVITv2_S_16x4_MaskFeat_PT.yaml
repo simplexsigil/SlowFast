@@ -2,9 +2,9 @@ TASK: ssl
 TRAIN:
   ENABLE: True
   DATASET: AMARV
-  BATCH_SIZE: 80
+  BATCH_SIZE: 120
   EVAL_PERIOD: 1000000
-  CHECKPOINT_PERIOD: 5
+  CHECKPOINT_PERIOD: 1
   AUTO_RESUME: True
 DATA:
   PATH_TO_DATA_DIR: /hkfs/work/workspace/scratch/kf3609-datasets/AMARV/annotations/run4_2023_01_27
