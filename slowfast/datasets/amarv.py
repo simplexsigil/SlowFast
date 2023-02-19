@@ -152,32 +152,46 @@ class Amarv(torch.utils.data.Dataset):
             else:
                 rows = f.read().splitlines()
 
-            path_cache_file = os.path.split(self.cfg.DATA.PATH_PREFIX[:-1] if self.cfg.DATA.PATH_PREFIX.endswith(
-                os.sep) else self.cfg.DATA.PATH_PREFIX)[1]
+            data_paths = self.cfg.DATA.PATH_PREFIX.split(";")
 
-            path_cache_file = os.path.join('cache', path_cache_file + ".pkl")
-            os.makedirs("cache", exist_ok=True)
+            self._sequence_path_map = {}
+            sequence_path_maps = []
 
-            if not os.path.exists(path_cache_file):
-                existing_sequence_paths = glob.glob(os.path.join(self.cfg.DATA.PATH_PREFIX, "**/sequence_*"),
-                                                    recursive=True)
-                self._sequence_path_map = {}
+            for dp in data_paths:
+                path_base = os.path.split(dp[:-1] if dp.endswith(os.sep) else dp)[1]
+                path_cache_file = os.path.join('cache', path_base + ".pkl")
 
-                for p in existing_sequence_paths:
-                    rel_sequence_path = os.path.relpath(p, self.cfg.DATA.PATH_PREFIX)
-                    rel_sample_path = os.path.split(rel_sequence_path)[0]
+                os.makedirs("cache", exist_ok=True)
 
-                    if rel_sample_path not in self._sequence_path_map:
-                        self._sequence_path_map[rel_sample_path] = [rel_sequence_path]
-                    else:
-                        self._sequence_path_map[rel_sample_path].append(rel_sequence_path)
+                if not os.path.exists(path_cache_file):
+                    existing_sequence_paths = glob.glob(os.path.join(dp, "**/sequence_*"), recursive=True)
 
-                with open(path_cache_file, 'wb') as handle:
-                    pickle.dump(self._sequence_path_map, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                    if len(existing_sequence_paths) == 0:
+                        print(f"Warning: not a single sequence found for path {dp}")
 
-            else:
-                with open(path_cache_file, 'rb') as handle:
-                    self._sequence_path_map = pickle.load(handle)
+                    spm = {}
+
+                    for p in existing_sequence_paths:
+                        rel_sequence_path = os.path.relpath(p, dp)
+                        rel_sample_path = os.path.split(rel_sequence_path)[0]
+
+                        rel_sequence_path = os.path.join(path_base, rel_sequence_path)
+
+                        if rel_sample_path not in spm:
+                            spm[rel_sample_path] = [rel_sequence_path]
+                        else:
+                            spm[rel_sample_path].append(rel_sequence_path)
+
+                    with open(path_cache_file, 'wb') as handle:
+                        pickle.dump(spm, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+                else:
+                    with open(path_cache_file, 'rb') as handle:
+                        spm = pickle.load(handle)
+
+                sequence_path_maps.append(spm)
+
+            for spm in sequence_path_maps: self._sequence_path_map.update(spm)
 
             for clip_idx, path_label in tqdm.tqdm(enumerate(rows)):
                 fetch_info = path_label.split(

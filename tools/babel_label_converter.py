@@ -73,6 +73,11 @@ def dirty_fixes(anns):
     if 'MPImosh/50021/armyposes' in anns:
         anns["MPImosh/50021/army"] = anns['MPImosh/50021/armyposes']
         print(f"Applied dirty fix for MPImosh/50021/armyposes")
+
+    if 'MPImosh/00058/armyposes' in anns:
+        anns["MPImosh/00058/army"] = anns['MPImosh/00058/armyposes']
+        print(f"Applied dirty fix for MPImosh/00058/armyposes")
+
     if "MPImosh/50022/stretchposes" in anns:
         anns["MPImosh/50022/stretch"] = anns["MPImosh/50022/stretchposes"]
         print(f"Applied dirty fix for MPImosh/50022/stretchposes")
@@ -89,7 +94,7 @@ def main():
                         default=os.path.expandvars("$LSDF/data/activity/BABEL/category_index.csv"),
                         help="Path to label indices")
     parser.add_argument("--base_path", type=str,
-                        default=os.path.expandvars("$LSDF/data/activity/AMARV/run4_2023_02_11/"),
+                        default=os.path.expandvars("/lsdf/kit/anthropomatik/projects/cvhci/data/activity/AMARV/run4_2023_02_05/"),
                         help="Path to base directory")
     parser.add_argument("--path_file", type=str,
                         default=None,
@@ -149,8 +154,10 @@ def main():
             i += 1
     print(f"{i} paths without annotations (and potentially more sequences).")
 
+    assert set(babel_top_150_index.keys()).issubset(set(act_cat_indices.keys()))
+
     bcc = {k: 0 for k in babel_top_150_index.keys()}  # babel challenge counter
-    acc = {k: 0 for k in raw_act_indices.keys()}  # action cat counter
+    acc = {k: 0 for k in act_cat_indices.keys()}  # action cat counter
 
     for anns, outfile in zip([train_anns, val_anns, test_anns], ["train.csv", "val.csv", "test.csv"]):
         num_lines = 0
@@ -163,8 +170,10 @@ def main():
                     for seg in segs:
                         if seg["act_cat"] is not None:
                             for a in seg["act_cat"]:
-                                if a in babel_top_150_index: bcc[a] += 1
-                                if a in acc: acc[a] += 1
+                                if a in babel_top_150_index:
+                                    bcc[a] += 1
+                                if a in acc:
+                                    acc[a] += 1
 
                         action_cats = [str(act_cat_indices[a]) for a in seg["act_cat"]] \
                             if seg["act_cat"] is not None else ["-1", ]
@@ -186,8 +195,8 @@ def main():
 
         print(f"Wrote {num_lines} paths with annotations in {outfile}")
 
-        print(json.dumps(bcc, indent=4))
-        print(json.dumps(acc, indent=4))
+    print(json.dumps(bcc, indent=4))
+    print(json.dumps(acc, indent=4))
 
 if __name__ == "__main__":
     main()
