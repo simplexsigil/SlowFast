@@ -166,7 +166,7 @@ class Amarv(torch.utils.data.Dataset):
                 os.makedirs("cache", exist_ok=True)
 
                 if self.cfg.DATA.PATH_CACHE and os.path.exists(path_cache_file):
-                    with open(path_cache_file, 'rb') as handle:
+                    with open(path_cache_file, 'r') as handle:
                         existing_sequence_paths = json.load(handle)
 
                     if len(existing_sequence_paths) == 0:
@@ -175,7 +175,7 @@ class Amarv(torch.utils.data.Dataset):
                 else:
                     existing_sequence_paths = glob.glob(os.path.join(dp, "**/sequence_*"), recursive=True)
 
-                    with open(path_cache_file, 'wb') as handle:
+                    with open(path_cache_file, 'w') as handle:
                         json.dump(existing_sequence_paths, handle)
 
                     if len(existing_sequence_paths) == 0:
