@@ -142,10 +142,10 @@ class ContrastiveModel(nn.Module):
     @torch.no_grad()
     def init_knn_labels(self, train_loader):
         logger.info("initializing knn labels")
-        self.num_imgs = len(train_loader.dataset._labels)
+        self.num_imgs = len(train_loader.dataset._labels_proc)
         self.train_labels = np.zeros((self.num_imgs,), dtype=np.int32)
         for i in range(self.num_imgs):
-            self.train_labels[i] = train_loader.dataset._labels[i]
+            self.train_labels[i] = train_loader.dataset._labels_proc[i]
         self.train_labels = torch.LongTensor(self.train_labels).cuda()
         if self.length != self.num_imgs:
             logger.error(
