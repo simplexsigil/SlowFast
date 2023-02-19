@@ -6,6 +6,7 @@ from .contrastive import ContrastiveModel  # noqa
 from .custom_video_model_builder import *  # noqa
 from .masked import MaskMViT  # noqa
 from .video_model_builder import MViT, ResNet, SlowFast  # noqa
+from .omnivore_model import OmnivoreDepth
 
 try:
     from .ptv_model_builder import (

@@ -757,7 +757,8 @@ class SwinTransformer3D(nn.Module):
         pretrained3d=None,
         pretrained_model_key="base_model",
         patch_size=(4, 4, 4),
-        in_chans=3,
+        rgb_in_chans=3,
+        depth_in_chans=1,
         embed_dim=96,
         depths=[2, 2, 6, 2],
         num_heads=[3, 6, 12, 24],
@@ -771,8 +772,7 @@ class SwinTransformer3D(nn.Module):
         norm_layer=nn.LayerNorm,
         patch_norm=False,
         frozen_stages=-1,
-        depth_mode=None,
-        depth_patch_embed_separate_params=True,
+        input_modality='rgb',  # 'rgb', 'd', 'rgbd
     ):
         super().__init__()
 
@@ -787,61 +787,26 @@ class SwinTransformer3D(nn.Module):
         self.frozen_stages = frozen_stages
         self.window_size = window_size
         self.patch_size = patch_size
+        self.input_modality = input_modality
+        assert input_modality in ['rgb', 'd']
 
-        self.depth_mode = depth_mode
         depth_chans = None
         # assert in_chans == 3, "Only 3 channels supported"
 
         # split image into non-overlapping patches
         self.patch_embed = PatchEmbed3D(
             patch_size=patch_size,
-            in_chans=in_chans,
+            in_chans=rgb_in_chans,
             embed_dim=embed_dim,
             norm_layer=norm_layer if self.patch_norm else None,
         )
-
-        if depth_mode is not None:
-            msg = f"Using depth mode {depth_mode}"
-            logging.info(msg)
-            assert depth_mode in ["separate_d_tokens", "summed_rgb_d_tokens", "rgbd"]
-            if depth_mode in ["separate_d_tokens", "summed_rgb_d_tokens"]:
-                depth_chans = 1
-                assert (
-                    depth_patch_embed_separate_params
-                ), "separate tokenization needs separate parameters"
-                if depth_mode == "separate_d_tokens":
-                    raise NotImplementedError()
-            else:
-                assert depth_mode == "rgbd"
-                depth_chans = 4
-
-            self.depth_patch_embed_separate_params = depth_patch_embed_separate_params
-
-            if depth_patch_embed_separate_params:
-                self.depth_patch_embed = PatchEmbed3D(
-                    patch_size=patch_size,
-                    in_chans=depth_chans,
-                    embed_dim=embed_dim,
-                    norm_layer=norm_layer if self.patch_norm else None,
-                )
-            else:
-                # share parameters with patch_embed
-                # delete the layer we built above
-                del self.patch_embed
-                assert depth_chans == 4
-                logging.info(
-                    "Certain channels of patch projection may not be used in forward pass"
-                )
-                logging.info(
-                    "Make sure config.DISTRIBUTED.FIND_UNUSED_PARAMETERS is set to True"
-                )
-                self.patch_embed = PatchEmbed3D(
-                    patch_size=patch_size,
-                    in_chans=3,
-                    embed_dim=embed_dim,
-                    additional_variable_channels=[1],
-                    norm_layer=norm_layer if self.patch_norm else None,
-                )
+        if 'd' in input_modality:
+            self.depth_patch_embed = PatchEmbed3D(
+                patch_size=patch_size,
+                in_chans=depth_in_chans,
+                embed_dim=embed_dim,
+                norm_layer=norm_layer if self.patch_norm else None,
+            )
 
         self.pos_drop = nn.Dropout(p=drop_rate)
 
@@ -1140,24 +1105,10 @@ class SwinTransformer3D(nn.Module):
     def get_patch_embedding(self, x):
         # x: B x C x T x H x W
         assert x.ndim == 5
-        has_depth = x.shape[1] == 4
 
-        if has_depth:
-            if self.depth_mode in ["summed_rgb_d_tokens"]:
-                x_rgb = x[:, :3, ...]
-                x_d = x[:, 3:, ...]
-                x_d = self.depth_patch_embed(x_d)
-                x_rgb = self.patch_embed(x_rgb)
-                # sum the two sets of tokens
-                x = x_rgb + x_d
-            elif self.depth_mode == "rgbd":
-                if self.depth_patch_embed_separate_params:
-                    x = self.depth_patch_embed(x)
-                else:
-                    x = self.patch_embed(x)
-            else:
-                logging.info("Depth mode %s not supported" % self.depth_mode)
-                raise NotImplementedError()
+        if self.input_modality == 'd':
+            assert x.shape[1] == 1
+            x = self.depth_patch_embed(x)
         else:
             x = self.patch_embed(x)
         return x

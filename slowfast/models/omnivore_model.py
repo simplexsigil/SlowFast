@@ -12,7 +12,8 @@ import torch
 import torch.nn as nn
 from torch.hub import load_state_dict_from_url
 
-from slowfast.models.swin_transformer import SwinTransformer3D
+from .swin_transformer import SwinTransformer3D
+from .build import MODEL_REGISTRY
 
 
 def get_all_heads(dim_in: int = 1024) -> nn.Module:
@@ -39,6 +40,29 @@ def get_sunrgbd_head(dim_in: int = 1024) -> nn.Module:
 def get_kinetics_head(dim_in: int = 1024, num_classes: int = 400) -> nn.Module:
     head = nn.Linear(in_features=dim_in, out_features=num_classes, bias=True)
     return nn.Sequential(nn.Dropout(p=0.5), head)
+
+
+@MODEL_REGISTRY.register()
+class OmnivoreDepth(nn.Module):
+    def __init__(self, cfg):
+        super().__init__()
+        self.trunk = omnivore_swinB_depth(load_heads=False)
+        self.head = nn.Linear(
+            in_features=1024, out_features=cfg.MODEL.NUM_CLASSES)
+        self._freeze_fn()
+
+    def forward(self, x: torch.Tensor):
+        x = x[0]
+        assert x.ndim == 5
+        features = self.trunk(x)
+        return self.head(features)
+
+    def _freeze_fn(self):
+        unfreeze_modules = ['patch_embed', 'depth_patch_embed']
+        for name, param in self.trunk.named_parameters():
+            if name.split('.')[0] in unfreeze_modules:
+                continue
+            param.requires_grad = False
 
 
 class OmnivoreModel(nn.Module):
@@ -128,6 +152,58 @@ def _omnivore_base(
     else:
         model = trunk
 
+    return model
+
+
+def omnivore_swinB_depth(
+    pretrained: bool = True,
+    progress: bool = True,
+    load_heads: bool = True,
+    checkpoint_name: str = "omnivore_swinB_in21k",
+    **kwargs: Any,
+) -> nn.Module:
+    r"""
+    Omnivore model trunk: Swin B patch (2,4,4) window (1,6,7,7)
+
+    Args:
+        pretrained: if True loads weights from model trained on
+            Imagenet 1k, Kinetics 400, SUN RGBD.
+        progress: print progress of loading checkpoint
+        load_heads: if True, loads the 3 heads, one each for
+            image/video/rgbd prediction. If False loads only the
+            trunk.
+
+    Returns:
+        model: nn.Module of the omnivore model
+    """
+
+    # Only specify the non default values
+    trunk = SwinTransformer3D(
+        pretrained2d=False,
+        patch_size=(2, 4, 4),
+        embed_dim=128,
+        depths=[2, 2, 18, 2],
+        num_heads=[4, 8, 16, 32],
+        window_size=(16, 7, 7),
+        drop_path_rate=0.3,  # TODO: set this based on the final models
+        patch_norm=True,  # Make this the default value?
+        input_modality='d',
+        **kwargs,
+    )
+
+    model = _omnivore_base(
+        trunk=trunk,
+        head_dim_in=1024,  # embed_dim * 8 = 128*8
+        progress=progress,
+        pretrained=pretrained,
+        load_heads=load_heads,
+        checkpoint_name=checkpoint_name,
+    )
+
+    if load_heads:
+        del model.trunk.patch_embed
+    else:
+        del model.patch_embed
     return model
 
 
