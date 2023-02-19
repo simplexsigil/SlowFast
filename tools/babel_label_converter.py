@@ -6,6 +6,8 @@ import pandas as pd
 import argparse
 import re
 import natsort
+from babel_120_60_label_to_index import label_to_index as babel_top_150_index
+import pprint
 
 
 def extract_label_and_set_times(sample):
@@ -31,11 +33,20 @@ def get_label_indices(label_indices_path):
         label_indices["category"].values)}
 
 
-def get_path_mappings(base_path, pattern="**/sequence_*"):
-    glob_pattern = os.path.join(base_path, pattern)
-    print(f"Glob pattern: {glob_pattern}")
-    files = glob.glob(glob_pattern, recursive=True)
-    print(len(files))
+def get_path_mappings(base_path, pattern="**/sequence_*", path_file=None):
+    if path_file is not None and os.path.exists(path_file):
+        with open(path_file, "r") as f:
+            files = json.load(f)
+    else:
+        glob_pattern = os.path.join(base_path, pattern)
+        print(f"Glob pattern: {glob_pattern}")
+        files = glob.glob(glob_pattern, recursive=True)
+        print(len(files))
+
+        if path_file:
+            with open(path_file, "w") as f:
+                json.dump(files, f)
+
     return {os.path.join(*os.path.normpath(p).split(os.path.sep)[-4:-1]):
                 p.removeprefix(base_path).replace("_", "").replace(" ", "")
             for p in files}, \
@@ -67,7 +78,6 @@ def dirty_fixes(anns):
 
     if 'MPImosh/00058/armyposes' in anns:
         anns["MPImosh/00058/army"] = anns['MPImosh/00058/armyposes']
-        del anns['MPImosh/00058/armyposes']
         print(f"Applied dirty fix for MPImosh/00058/armyposes")
 
     if "MPImosh/50022/stretchposes" in anns:
@@ -89,6 +99,9 @@ def main():
     parser.add_argument("--base_path", type=str,
                         default=os.path.expandvars("$LSDF/data/activity/AMARV/run4_2023_02_05/"),
                         help="Path to base directory")
+    parser.add_argument("--path_file", type=str,
+                        default=None,
+                        help="Cache file to avoid searching file system.")
     parser.add_argument("--output_directory", type=str, default=None, help="Output file name")
     parser.add_argument('--save_index_files', action=argparse.BooleanOptionalAction)
 
@@ -101,14 +114,19 @@ def main():
     raw_act_indices, act_cat_indices = get_label_indices(args.label_indices)
 
     if args.save_index_files:
-        with open(os.path.join(args.output_directory, 'act_cat_indices.csv'), 'w') as f:
+        with open(os.path.join(args.output_directory, 'act_cat_indices_new.csv'), 'w') as f:
             w = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             for row in act_cat_indices.items():
                 w.writerow(row)
 
-        with open(os.path.join(args.output_directory, 'raw_act_indices.csv'), 'w') as f:
+        with open(os.path.join(args.output_directory, 'raw_act_indices_new.csv'), 'w') as f:
             w = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             for row in raw_act_indices.items():
+                w.writerow(row)
+
+        with open(os.path.join(args.output_directory, 'babel_challenge_indices.csv'), 'w') as f:
+            w = csv.writer(f, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            for row in babel_top_150_index.items():
                 w.writerow(row)
 
     train_anns = get_anns(os.path.join(args.babel_root, "train.json"))
@@ -128,7 +146,7 @@ def main():
 
     print(f"{len(all_anns)} annotations in total.")
 
-    _, path_mappings = get_path_mappings(args.base_path)
+    _, path_mappings = get_path_mappings(args.base_path, path_file=args.path_file)
     print(f"Found {len(path_mappings)} paths in {args.base_path}.")
     pd.DataFrame.from_records(list(path_mappings.items())).to_csv("paths.csv", header=False, index=False)
 
@@ -144,6 +162,11 @@ def main():
             print(f"Annotation {ann} has no corresponding path.")
             i += 1
 
+    assert set(babel_top_150_index.keys()).issubset(set(act_cat_indices.keys()))
+
+    bcc = {k: 0 for k in babel_top_150_index.keys()}  # babel challenge counter
+    acc = {k: 0 for k in act_cat_indices.keys()}  # action cat counter
+
     for anns, outfile in zip([train_anns, val_anns, test_anns], ["train.csv", "val.csv", "test.csv"]):
         num_lines = 0
         with open(os.path.join(args.output_directory, outfile), 'w') as csvfile:
@@ -153,20 +176,35 @@ def main():
                 if sam in anns:
                     segs, dur = anns[sam]
                     for seg in segs:
-                        action_cat_indices = [str(act_cat_indices[a]) for a in seg["act_cat"]] if seg[
-                                                                                                      "act_cat"] is not None else [
-                            "-1", ]
-                        raw_cat_index = raw_act_indices[' '.join(seg["proc_label"].split())] if seg[
-                                                                                                    "proc_label"] is not None else "-1"
+                        if seg["act_cat"] is not None:
+                            for a in seg["act_cat"]:
+                                if a in babel_top_150_index:
+                                    bcc[a] += 1
+                                if a in acc:
+                                    acc[a] += 1
 
-                        line = [path, ";".join(action_cat_indices),
+                        action_cats = [str(act_cat_indices[a]) for a in seg["act_cat"]] \
+                            if seg["act_cat"] is not None else ["-1", ]
+
+                        babel_challenge_cats = [str(babel_top_150_index[a]) if a in babel_top_150_index else "-1" \
+                                                for a in seg["act_cat"]] \
+                            if seg["act_cat"] is not None \
+                            else ["-1", ]
+
+                        raw_cat = raw_act_indices[' '.join(seg["proc_label"].split())] \
+                            if seg["proc_label"] is not None else "-1"
+
+                        line = [path, ";".join(action_cats), ";".join(babel_challenge_cats),
                                 ";".join(seg["act_cat"]) if seg["act_cat"] else "None",
-                                raw_cat_index, seg["proc_label"] if seg["proc_label"] else "None",
+                                raw_cat, seg["proc_label"] if seg["proc_label"] else "None",
                                 str(seg["start_t"]), str(seg["end_t"]), str(dur)]
                         writer.writerow(line)
                     num_lines += 1
 
         print(f"Wrote {num_lines} paths with annotations in {outfile}")
+
+    print(json.dumps(bcc, indent=4))
+    print(json.dumps(acc, indent=4))
 
 
 if __name__ == "__main__":
