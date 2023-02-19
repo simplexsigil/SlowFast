@@ -62,9 +62,17 @@ def get_anns(babel_file_path):
 def dirty_fixes(anns):
     if 'MPImosh/50021/armyposes' in anns:
         anns["MPImosh/50021/army"] = anns['MPImosh/50021/armyposes']
+        del anns['MPImosh/50021/armyposes']
         print(f"Applied dirty fix for MPImosh/50021/armyposes")
+
+    if 'MPImosh/00058/armyposes' in anns:
+        anns["MPImosh/00058/army"] = anns['MPImosh/00058/armyposes']
+        del anns['MPImosh/00058/armyposes']
+        print(f"Applied dirty fix for MPImosh/00058/armyposes")
+
     if "MPImosh/50022/stretchposes" in anns:
         anns["MPImosh/50022/stretch"] = anns["MPImosh/50022/stretchposes"]
+        del anns["MPImosh/50022/stretchposes"]
         print(f"Applied dirty fix for MPImosh/50022/stretchposes")
 
     return anns
@@ -79,7 +87,7 @@ def main():
                         default=os.path.expandvars("$LSDF/data/activity/BABEL/category_index.csv"),
                         help="Path to label indices")
     parser.add_argument("--base_path", type=str,
-                        default=os.path.expandvars("$LSDF/data/activity/AMARV/run4_2023_01_27/"),
+                        default=os.path.expandvars("$LSDF/data/activity/AMARV/run4_2023_02_05/"),
                         help="Path to base directory")
     parser.add_argument("--output_directory", type=str, default=None, help="Output file name")
     parser.add_argument('--save_index_files', action=argparse.BooleanOptionalAction)
@@ -127,9 +135,14 @@ def main():
     i = 0
     for sams in set(path_mappings.values()):
         if sams not in all_anns:
-            print(f"{sams} has no corresponding annotation.")
+            print(f"Path {sams} has no corresponding annotation.")
             i += 1
     print(f"{i} paths without annotations (and potentially more sequences).")
+
+    for ann in all_anns:
+        if ann not in set(path_mappings.values()):
+            print(f"Annotation {ann} has no corresponding path.")
+            i += 1
 
     for anns, outfile in zip([train_anns, val_anns, test_anns], ["train.csv", "val.csv", "test.csv"]):
         num_lines = 0
