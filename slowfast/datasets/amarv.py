@@ -14,6 +14,7 @@ import tqdm
 
 import warnings
 warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._functional_video.*")
+warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._transforms_video.*")
 
 from torchvision import transforms
 

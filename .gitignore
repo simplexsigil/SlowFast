@@ -1,3 +1,4 @@
+ext_checkpoints/*
 runs-AMARV
 experiments/*
 cache/*
@@ -9,4 +10,5 @@ checkpoints
 old_checkpoints
 *.log
 *.egg-info
+**/*.csv
 tmp.py
