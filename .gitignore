@@ -10,3 +10,4 @@ checkpoints
 old_checkpoints
 *.log
 *.egg-info
+**/*.csv

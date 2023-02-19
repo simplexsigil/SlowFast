@@ -2,7 +2,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 import glob
 import os
-import pickle
+import json
 import random
 from typing import List
 
@@ -172,11 +172,11 @@ class Amarv(torch.utils.data.Dataset):
                         self._sequence_path_map[rel_sample_path].append(rel_sequence_path)
 
                 with open(path_cache_file, 'wb') as handle:
-                    pickle.dump(self._sequence_path_map, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                    json.dump(self._sequence_path_map, handle)
 
             else:
                 with open(path_cache_file, 'rb') as handle:
-                    self._sequence_path_map = pickle.load(handle)
+                    self._sequence_path_map = json.load(handle)
 
             for clip_idx, path_label in tqdm.tqdm(enumerate(rows)):
                 fetch_info = path_label.split(
