@@ -19,8 +19,8 @@ TEST:
   # NUM_SPATIAL_CROPS: 1
   NUM_SPATIAL_CROPS: 3
 DATA:
-  PATH_TO_DATA_DIR: /pfs/work7/workspace/scratch/kf3609-datasets/AMARV/annotations/run4_2023_01_27
-  PATH_PREFIX: /pfs/work7/workspace/scratch/kf3609-datasets/AMARV/run4_2023_01_27/
+  PATH_TO_DATA_DIR: "$AMARV_ANNS"
+  PATH_PREFIX: "$AMARV_RUN1;$AMARV_RUN2;$AMARV_RUN3"
   PATH_LABEL_SEPARATOR: ","
   NUM_FRAMES: 13
   SAMPLING_RATE: 6
