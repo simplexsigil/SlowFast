@@ -1,6 +1,6 @@
 TRAIN:
   # ENABLE: False # default True
-  DATASET: kinetics
+  DATASET: AMARV
   BATCH_SIZE: 128
   EVAL_PERIOD: 10
   CHECKPOINT_PERIOD: 10
@@ -13,8 +13,8 @@ X3D:
   DIM_C1: 12
 TEST:
   ENABLE: True
-  DATASET: kinetics
-  BATCH_SIZE: 64
+  DATASET: AMARV
+  BATCH_SIZE: 128
   # CHECKPOINT_FILE_PATH: 'x3d_s.pyth' # 73.50% top1 30-view accuracy to download from the model zoo (optional).
   # NUM_SPATIAL_CROPS: 1
   NUM_SPATIAL_CROPS: 3
@@ -48,7 +48,7 @@ SOLVER:
   WARMUP_START_LR: 0.01
   OPTIMIZING_METHOD: sgd
 MODEL:
-  NUM_CLASSES: 400
+  NUM_CLASSES: 272
   ARCH: x3d
   MODEL_NAME: X3D
   LOSS_FUNC: cross_entropy

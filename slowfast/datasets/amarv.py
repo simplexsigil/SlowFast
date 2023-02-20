@@ -219,12 +219,9 @@ class Amarv(torch.utils.data.Dataset):
                 else:
                     try:
                         path, act_cats, act_cats_150, act_cats_labels, act, act_label, t_start, t_stop, dur = fetch_info
-                    except Exception as e:
-                        raise RuntimeError(
-                            "Failed to parse video fetch {} info {} retries.".format(
-                                path_to_file, fetch_info
-                                )
-                            )
+                    except Exception as e:                        
+                        # raise RuntimeError("Failed to parse {} info {}.".format(path_to_file, fetch_info))
+                        raise e 
 
                 def add_row(sequence_dir, clip_index, act, act_cat, act_cat_150, t_start, t_stop, dur):
                     # self._path_to_sequence.append(os.path.join(self.cfg.DATA.PATH_PREFIX, sequence_dir))
