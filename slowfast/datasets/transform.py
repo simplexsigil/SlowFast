@@ -625,6 +625,7 @@ def create_random_augment(
     input_size,
     auto_augment=None,
     interpolation="bilinear",
+    is_depth=False,
 ):
     """
     Get video randaug transform.
@@ -635,6 +636,7 @@ def create_random_augment(
             "rand-m7-n4-mstd0.5-inc1" (m is the magnitude and n is the number
             of operations to apply).
         interpolation: Interpolation method.
+        is_depth: Input modality, whether it is depth.
     """
     if isinstance(input_size, tuple):
         img_size = input_size[-2:]
@@ -652,7 +654,7 @@ def create_random_augment(
             aa_params["interpolation"] = _pil_interp(interpolation)
         if auto_augment.startswith("rand"):
             return transforms.Compose(
-                [rand_augment_transform(auto_augment, aa_params)]
+                [rand_augment_transform(auto_augment, aa_params, is_depth)]
             )
     raise NotImplementedError
 
@@ -1214,3 +1216,92 @@ class GaussianBlurVideo(object):
         frames = gaussian_filter(frames, sigma=(0.0, sigma_t, sigma_y, sigma_x))
         frames = torch.from_numpy(frames)
         return frames
+
+
+def color_to_depth_realsense(
+        color_img: torch.Tensor, d_max, d_min,
+        inverse_colorization=True,
+        return_disparity=True,
+):
+    """Convert rgb value to quantization 0-1529 value
+    Reference:
+        1) https://dev.intelrealsense.com/docs/depth-image-compression-by-colorization-for-intel-realsense-depth-cameras
+    """
+    if d_min <= 0:
+        raise ValueError('d_min should greater than 0.')
+
+    if color_img.dtype == torch.uint8:
+        color_img = color_img.float()
+
+    dnormal = torch.zeros(color_img.shape[:-1], dtype=color_img.dtype)
+    # color_img should be in RGB
+    prr, prg, prb = color_img[..., 0], color_img[..., 1], color_img[..., 2]
+
+    # get all needed masks
+    prr_greater_equal_prg = prr >= prg
+    prr_greater_equal_prb = prr >= prb
+    prg_greater_equal_prb = prg >= prb
+    prg_smaller_prb = ~prg_greater_equal_prb
+    prg_greater_equal_prr = prg >= prr
+    prb_greater_equal_prg = prb >= prg
+    prb_greater_equal_prr = prb >= prr
+    prr_greater_equal_prg_and_prb = prr_greater_equal_prg & prr_greater_equal_prb
+
+    # prg - prb (first row of the formulation)
+    mask_prg_minus_prb = (prr_greater_equal_prg_and_prb
+                          & prg_greater_equal_prb)
+    dnormal[mask_prg_minus_prb] = (prg - prb)[mask_prg_minus_prb]
+
+    # prg - prb + 1529 (second row of the formulation)
+    mask_prg_minus_prb_plus_1529 = (prr_greater_equal_prg_and_prb & prg_smaller_prb)
+    dnormal[mask_prg_minus_prb_plus_1529] = (prg - prb + 1529)[mask_prg_minus_prb_plus_1529]
+
+    # prb - prr + 510
+    mask_prb_minus_prr_plus_510 = prg_greater_equal_prr & prg_greater_equal_prb
+    dnormal[mask_prb_minus_prr_plus_510] = (prb - prr + 510)[mask_prb_minus_prr_plus_510]
+
+    # prr - prg + 1020
+    mask_prr_minus_prg_plus_1020 = prb_greater_equal_prg & prb_greater_equal_prr
+    dnormal[mask_prr_minus_prg_plus_1020] = (prr - prg + 1020)[mask_prr_minus_prg_plus_1020]
+
+    if not inverse_colorization:
+        d_recovery = d_min + (d_max - d_min) * dnormal / 1529
+        if return_disparity:
+            d_recovery = 1 / d_recovery
+        return d_recovery
+
+    disp_min = 1 / d_max
+    disp_max = 1 / d_min
+    d_recovery = disp_min + (disp_max - disp_min) * dnormal / 1529
+    if not return_disparity:
+        d_recovery = 1 / d_recovery
+
+    return d_recovery.unsqueeze(-1)
+
+
+class DepthNorm(torch.nn.Module):
+    """
+    Normalize the depth channel
+    The depth channel is also clamped at 0.0.
+    """
+
+    def __init__(
+        self,
+        max_depth: float,
+        min_depth: float,
+    ):
+        super().__init__()
+        self.max_depth = max_depth
+        self.min_depth = min_depth
+        self.denominator = max_depth - min_depth
+
+    def __call__(self, input: torch.Tensor):
+        T, H, W, C = input.shape
+        if C != 1:
+            err_msg = (
+                f"This transform is for 1 channel Depth input only; got {input.shape}"
+            )
+            raise ValueError(err_msg)
+
+        return input.sub_(self.min_depth).div_(self.denominator)
+

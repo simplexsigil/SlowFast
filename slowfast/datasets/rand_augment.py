@@ -36,6 +36,7 @@ from PIL import Image, ImageEnhance, ImageOps
 _PIL_VER = tuple([int(x) for x in PIL.__version__.split(".")[:2]])
 
 _FILL = (128, 128, 128)
+_DEPTH_FILL = 128
 
 # This signifies the max integer that the controller RNN could predict for the
 # augmentation scheme.
@@ -422,6 +423,17 @@ _RAND_INCREASING_TRANSFORMS = [
 ]
 
 
+# Ops which can be used on depth, based on Omnivore
+DEPTH_OPS = [
+    "ShearX",
+    "ShearY",
+    "TranslateXRel",
+    "TranslateYRel",
+    "Rotate",
+    "Invert",
+]
+
+
 # These experimental weights are based loosely on the relative improvements mentioned in paper.
 # They may not result in increased performance, but could likely be tuned to so.
 _RAND_CHOICE_WEIGHTS_0 = {
@@ -452,12 +464,14 @@ def _select_rand_weights(weight_idx=0, transforms=None):
     return probs
 
 
-def rand_augment_ops(magnitude=10, hparams=None, transforms=None):
+def rand_augment_ops(magnitude=10, hparams=None, transforms=None, is_depth=False):
     hparams = hparams or _HPARAMS_DEFAULT
+    if "img_mean" not in hparams:
+        hparams["img_mean"] = _DEPTH_FILL if is_depth else _FILL
     transforms = transforms or _RAND_TRANSFORMS
     return [
         AugmentOp(name, prob=0.5, magnitude=magnitude, hparams=hparams)
-        for name in transforms
+        for name in transforms if not is_depth or (is_depth and name in DEPTH_OPS)
     ]
 
 
@@ -480,7 +494,7 @@ class RandAugment:
         return img
 
 
-def rand_augment_transform(config_str, hparams):
+def rand_augment_transform(config_str, hparams, is_depth=False):
     """
     RandAugment: Practical automated data augmentation... - https://arxiv.org/abs/1909.13719
 
@@ -525,7 +539,8 @@ def rand_augment_transform(config_str, hparams):
         else:
             assert NotImplementedError
     ra_ops = rand_augment_ops(
-        magnitude=magnitude, hparams=hparams, transforms=transforms
+        magnitude=magnitude, hparams=hparams, transforms=transforms,
+        is_depth=is_depth,
     )
     choice_weights = (
         None if weight_idx is None else _select_rand_weights(weight_idx)

@@ -50,7 +50,7 @@ def histogram_time_durations(time_durations, bin_size=0.2, max_time=5.0):
 
 
 @DATASET_REGISTRY.register()
-class Amarv(torch.utils.data.Dataset):
+class Amarvtmp(torch.utils.data.Dataset):
     """
     AMARV video loader. Construct the AMARV video loader, then sample
     clips from the videos. For training and validation, a single clip is
@@ -508,20 +508,6 @@ class Amarv(torch.utils.data.Dataset):
                     else:
                         f_out[idx] = f_out[idx] / 255.0
 
-                    if (
-                            self.mode in ["train"]
-                            and self.cfg.DATA.SSL_COLOR_JITTER
-                    ):
-                        f_out[idx] = transform.color_jitter_video_ssl(
-                            f_out[idx],
-                            bri_con_sat=self.cfg.DATA.SSL_COLOR_BRI_CON_SAT,
-                            hue=self.cfg.DATA.SSL_COLOR_HUE,
-                            p_convert_gray=self.p_convert_gray,
-                            moco_v2_aug=self.cfg.DATA.SSL_MOCOV2_AUG,
-                            gaussan_sigma_min=self.cfg.DATA.SSL_BLUR_SIGMA_MIN,
-                            gaussan_sigma_max=self.cfg.DATA.SSL_BLUR_SIGMA_MAX,
-                        )
-
                     if self.aug and self.cfg.AUG.AA_TYPE:
                         aug_transform = create_random_augment(
                             input_size=(f_out[idx].size(1), f_out[idx].size(2)),
@@ -536,59 +522,6 @@ class Amarv(torch.utils.data.Dataset):
                         f_out[idx] = self._list_img_to_frames(list_img)
                         f_out[idx] = f_out[idx].permute(0, 2, 3, 1)
 
-                    # Perform color normalization.
-                    f_out[idx] = utils.tensor_normalize(
-                        f_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
-                    )
-
-                    # T H W C -> C T H W.
-                    f_out[idx] = f_out[idx].permute(3, 0, 1, 2)
-
-                    scl, asp = (
-                        self.cfg.DATA.TRAIN_JITTER_SCALES_RELATIVE,
-                        self.cfg.DATA.TRAIN_JITTER_ASPECT_RELATIVE,
-                    )
-                    relative_scales = (
-                        None
-                        if (self.mode not in ["train"] or len(scl) == 0)
-                        else scl
-                    )
-                    relative_aspect = (
-                        None
-                        if (self.mode not in ["train"] or len(asp) == 0)
-                        else asp
-                    )
-                    f_out[idx] = utils.spatial_sampling(
-                        f_out[idx],
-                        spatial_idx=spatial_sample_index,
-                        min_scale=min_scale[i],
-                        max_scale=max_scale[i],
-                        crop_size=crop_size[i],
-                        random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
-                        inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
-                        aspect_ratio=relative_aspect,
-                        scale=relative_scales,
-                        motion_shift=self.cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
-                        if self.mode in ["train"]
-                        else False,
-                    )
-
-                    if self.rand_erase:
-                        erase_transform = RandomErasing(
-                            self.cfg.AUG.RE_PROB,
-                            mode=self.cfg.AUG.RE_MODE,
-                            max_count=self.cfg.AUG.RE_COUNT,
-                            num_splits=self.cfg.AUG.RE_COUNT,
-                            device="cpu",
-                        )
-                        f_out[idx] = erase_transform(
-                            f_out[idx].permute(1, 0, 2, 3)
-                        ).permute(1, 0, 2, 3)
-
-                    f_out[idx] = utils.pack_pathway_output(self.cfg, f_out[idx])
-                    if self.cfg.AUG.GEN_MASK_LOADER:
-                        mask = self._gen_mask()
-                        f_out[idx] = f_out[idx] + [torch.Tensor(), mask]
             frames = f_out[0] if num_out == 1 else f_out
             time_idx = np.array(time_idx_out)
             if (
