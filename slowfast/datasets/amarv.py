@@ -504,7 +504,7 @@ class Amarv(torch.utils.data.Dataset):
             num_out = num_aug * num_decode
             f_out, time_idx_out = [None] * num_out, [None] * num_out
             idx = -1
-            label = self._labels_proc[index]
+            label = self._labels_cats[index]
 
             for i in range(num_decode):
                 for _ in range(num_aug):
