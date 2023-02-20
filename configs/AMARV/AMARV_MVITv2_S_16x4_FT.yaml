@@ -9,8 +9,8 @@ TRAIN:
   AUTO_RESUME: True
   MIXED_PRECISION: True
 DATA:
-  PATH_TO_DATA_DIR: /hkfs/work/workspace/scratch/kf3609-datasets/AMARV/annotations/run4_2023_01_27
-  PATH_PREFIX: /hkfs/work/workspace/scratch/kf3609-datasets/AMARV/run4_2023_01_27/
+  PATH_TO_DATA_DIR: "$AMARV_ANNS"
+  PATH_PREFIX: "$AMARV_RUN1;$AMARV_RUN2;$AMARV_RUN3"
   PATH_LABEL_SEPARATOR: ","
   USE_OFFSET_SAMPLING: True
   DECODING_BACKEND: torchvision

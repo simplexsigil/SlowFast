@@ -6,4 +6,7 @@
 
 def add_custom_config(_C):
     # Add your own customized configs.
+    _C.DATA.PATH_CACHE = False
+    _C.DATA.ONLOAD_RESIZE = True  # Whether to automatically resize with ffmpeg when using torchvision.
+    _C.DATA.MODALITY = "RGB"  # input modality, RGB or Depth
     pass

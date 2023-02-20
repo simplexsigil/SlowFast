@@ -128,7 +128,7 @@ def get_multiple_start_end_idx(
 
         # It is ok to decode with 50% overlap outside of segment, but make sure, to stay in video file.
         min_starts, max_starts = decode_boundaries[0] - clip_sizes // 2, decode_boundaries[1] - clip_sizes // 2
-        min_starts, max_starts = max(min_starts, np.array([0] * len(clip_sizes))), min(max_starts, video_size_all - clip_sizes)
+        min_starts, max_starts = np.maximum(min_starts, np.array([0] * len(clip_sizes))), np.minimum(max_starts, video_size_all - clip_sizes)
 
         for clip_size, min_start, max_start in zip(clip_sizes, min_starts, max_starts):
             for i_try in range(num_retries):
@@ -168,7 +168,7 @@ def get_multiple_start_end_idx(
                     break
         return se_inds, dt
 
-    if not video_size_all: video_size_all = video_size  # Looking at the whole video instead of a segment.
+    if video_size_all is None: video_size_all = video_size  # Looking at the whole video instead of a segment.
 
     num_retries, goodness = 100, -math.inf
     for _ in range(num_retries):
