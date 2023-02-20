@@ -8,8 +8,8 @@ TRAIN:
   AUTO_RESUME: True
   KILL_LOSS_EXPLOSION_FACTOR: 2.0 # default 0.0 (not enforced)
 DATA:
-  PATH_TO_DATA_DIR: /pfs/work7/workspace/scratch/kf3609-datasets/AMARV/annotations/general/
-  PATH_PREFIX: /pfs/work7/workspace/scratch/kf3609-datasets/AMARV/runs/run4_2023_01_27/;/pfs/work7/workspace/scratch/kf3609-datasets/AMARV/runs/run4_2023_02_05/;/pfs/work7/workspace/scratch/kf3609-datasets/AMARV/runs/run4_2023_02_11/
+  PATH_TO_DATA_DIR: /pfs/work7/workspace/scratch/kf3609-datasets/AMARV/annotations/run4_2023_01_27
+  PATH_PREFIX: /pfs/work7/workspace/scratch/kf3609-datasets/AMARV/run4_2023_01_27/
   PATH_LABEL_SEPARATOR: ","
   USE_OFFSET_SAMPLING: True
   DECODING_BACKEND: torchvision
