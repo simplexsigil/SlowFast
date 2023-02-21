@@ -52,6 +52,7 @@ MODEL:
   ARCH: x3d
   MODEL_NAME: X3D
   LOSS_FUNC: cross_entropy
+
   DROPOUT_RATE: 0.5
 DATA_LOADER:
   NUM_WORKERS: 8
