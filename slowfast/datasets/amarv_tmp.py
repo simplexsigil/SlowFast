@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+import base64
 import glob
+import hashlib
+import json
 import os
-import pickle
 import random
+import warnings
 from typing import List
 
 import numpy as np
@@ -12,7 +15,6 @@ import torch
 import torch.utils.data
 import tqdm
 
-import warnings
 warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._functional_video.*")
 warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._transforms_video.*")
 
@@ -35,6 +37,14 @@ from .transform import (
 logger = logging.get_logger(__name__)
 
 import matplotlib.pyplot as plt
+
+
+def shash(s, k=-1):
+    hasher = hashlib.sha1(s.encode('utf-8'))
+    hsh = hasher.digest()
+    if k > 0:
+        hsh = hsh[:k]
+    return base64.urlsafe_b64encode(hsh).decode('utf-8')
 
 
 def histogram_time_durations(time_durations, bin_size=0.2, max_time=5.0):
@@ -61,7 +71,7 @@ class Amarvtmp(torch.utils.data.Dataset):
     bottom crop if the height is larger than the width.
     """
 
-    def __init__(self, cfg, mode, num_retries=100, use_act_cats=True):
+    def __init__(self, cfg, mode, num_retries=100):
         """
         Construct the AMARV video loader with a given csv file where each  row corresponds to a video segment
         (not a whole video). The format of the csv file for each row is:
@@ -86,7 +96,6 @@ class Amarvtmp(torch.utils.data.Dataset):
         ], "Split '{}' not supported for Kinetics".format(mode)
         self.mode = mode
         self.cfg = cfg
-        self.use_act_cats = use_act_cats
         self.p_convert_gray = self.cfg.DATA.COLOR_RND_GRAYSCALE
         self.p_convert_dt = self.cfg.DATA.TIME_DIFF_PROB
         self._num_retries = num_retries
@@ -130,16 +139,19 @@ class Amarvtmp(torch.utils.data.Dataset):
         """
         Construct the video loader.
         """
-        path_to_file = os.path.join(
-            self.cfg.DATA.PATH_TO_DATA_DIR, "{}.csv".format(self.mode)
-        )
+
+        path_to_label_dir = os.path.expandvars(self.cfg.DATA.PATH_TO_DATA_DIR)
+        path_to_file = os.path.join(path_to_label_dir, "{}.csv".format(self.mode))
+
         assert pathmgr.exists(path_to_file), "{} dir not found".format(
             path_to_file
         )
 
         self._path_to_sequence: List[str] = []
 
-        self._labels = []
+        self._labels_proc = []
+        self._labels_cats = []
+        self._labels_cats_150 = []
         self._spatial_temporal_idx = []
         self._clip_boundaries = []
         self._video_duration = []
@@ -148,40 +160,68 @@ class Amarvtmp(torch.utils.data.Dataset):
         self.chunk_epoch = 0
         self.epoch = 0.0
         self.skip_rows = self.cfg.DATA.SKIP_ROWS
-        use_act_cats = self.use_act_cats
 
         with pathmgr.open(path_to_file, "r") as f:
+            print(f"Loading data for {path_to_file}")
+
             if self.use_chunk_loading:
                 rows = self._get_chunk(f, self.cfg.DATA.LOADER_CHUNK_SIZE)
             else:
                 rows = f.read().splitlines()
 
-            path_cache_file = os.path.split(self.cfg.DATA.PATH_PREFIX[:-1] if self.cfg.DATA.PATH_PREFIX.endswith(
-                os.sep) else self.cfg.DATA.PATH_PREFIX)[1]
+            data_path_prefixes = os.path.expandvars(self.cfg.DATA.PATH_PREFIX)
+            data_paths = data_path_prefixes.split(";")
 
-            path_cache_file = os.path.join('cache', path_cache_file + ".pkl")
-            os.makedirs("cache", exist_ok=True)
+            print(f"Looking for sequences in {data_paths}")
 
-            if not os.path.exists(path_cache_file):
-                existing_sequence_paths = glob.glob(os.path.join(self.cfg.DATA.PATH_PREFIX, "**/sequence_*"),
-                                                    recursive=True)
-                self._sequence_path_map = {}
+            self._sequence_path_map = {}
+            sequence_path_maps = []
 
-                for p in existing_sequence_paths:
-                    rel_sequence_path = os.path.relpath(p, self.cfg.DATA.PATH_PREFIX)
-                    rel_sample_path = os.path.split(rel_sequence_path)[0]
+            for dp in data_paths:
+                path_dirs, path_base = os.path.split(dp[:-1] if dp.endswith(os.sep) else dp)
+                path_cache_file = os.path.join('cache', shash(path_dirs, 8) + "_" + path_base + ".json")
 
-                    if rel_sample_path not in self._sequence_path_map:
-                        self._sequence_path_map[rel_sample_path] = [rel_sequence_path]
+                os.makedirs("cache", exist_ok=True)
+
+                if self.cfg.DATA.PATH_CACHE and os.path.exists(path_cache_file):
+                    with open(path_cache_file, 'r') as handle:
+                        existing_sequence_paths = json.load(handle)
+
+                    if len(existing_sequence_paths) == 0:
+                        print(f"Warning: not a single sequence found for path {dp}")
+
+                else:
+                    existing_sequence_paths = glob.glob(os.path.join(dp, "**/sequence_*"), recursive=True)
+
+                    with open(path_cache_file, 'w') as handle:
+                        json.dump(existing_sequence_paths, handle)
+
+                    if len(existing_sequence_paths) == 0:
+                        print(f"Warning: not a single sequence found for path {dp}")
+
+                print(f"Found {len(existing_sequence_paths)} sequences in {dp}")
+
+                spm = {}
+
+                for seq_path in existing_sequence_paths:
+                    rel_seq_path = os.path.relpath(seq_path, dp)
+                    rel_sample_path = os.path.split(rel_seq_path)[0]
+
+                    # seq_path = os.path.join(path_base, seq_path)
+
+                    if rel_sample_path not in spm:
+                        spm[rel_sample_path] = [seq_path]
                     else:
-                        self._sequence_path_map[rel_sample_path].append(rel_sequence_path)
+                        spm[rel_sample_path].append(seq_path)
 
-                with open(path_cache_file, 'wb') as handle:
-                    pickle.dump(self._sequence_path_map, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                sequence_path_maps.append(spm)
 
-            else:
-                with open(path_cache_file, 'rb') as handle:
-                    self._sequence_path_map = pickle.load(handle)
+            for spm in sequence_path_maps:
+                for k, vl in spm.items():
+                    if k not in self._sequence_path_map:
+                        self._sequence_path_map[k] = vl
+                    else:
+                        self._sequence_path_map[k].extend(vl)
 
             for clip_idx, path_label in tqdm.tqdm(enumerate(rows)):
                 fetch_info = path_label.split(
@@ -192,13 +232,22 @@ class Amarvtmp(torch.utils.data.Dataset):
                     path, act = fetch_info[0], 0
                 else:
                     try:
-                        path, act_cats, act_cats_labels, act, act_label, t_start, t_stop, dur = fetch_info
+                        path, act_cats, act_cats_150, act_cats_labels, act, act_label, t_start, t_stop, dur = fetch_info
                     except Exception as e:
-                        raise RuntimeError(
-                            "Failed to parse video fetch {} info {} retries.".format(
-                                path_to_file, fetch_info
-                            )
-                        )
+                        # raise RuntimeError("Failed to parse {} info {}.".format(path_to_file, fetch_info))
+                        raise e
+
+                def add_row(sequence_dir, clip_index, act, act_cat, act_cat_150, t_start, t_stop, dur):
+                    # self._path_to_sequence.append(os.path.join(self.cfg.DATA.PATH_PREFIX, sequence_dir))
+                    self._path_to_sequence.append(sequence_dir)
+
+                    self._labels_proc.append(int(act))
+                    self._labels_cats.append(act_cat)
+                    self._labels_cats_150.append(act_cat_150)
+                    self._spatial_temporal_idx.append(clip_index)
+                    self._clip_boundaries.append((float(t_start), float(t_stop)))
+                    self._video_duration.append(float(dur))
+                    self._video_meta.append({})
 
                 # for local debugging
                 if path not in self._sequence_path_map:
@@ -206,25 +255,13 @@ class Amarvtmp(torch.utils.data.Dataset):
                     continue
 
                 for sequence_dir in self._sequence_path_map[path]:
-                    for idx in range(self._num_clips):
-                        self._path_to_sequence.append(os.path.join(self.cfg.DATA.PATH_PREFIX, sequence_dir))
+                    acs, acs_150 = list(int(c) for c in act_cats.split(";")), \
+                                   list(int(c) for c in act_cats_150.split(";"))
 
-                        if not use_act_cats:
-                            label = int(act)
-                        else:
-                            # For multi-label sequence, we randomly select a label.
-                            # For top1-accuracy, we should count if the predicted class
-                            # is contained in the multi-labels
-                            if ";" in act_cats:
-                                label = int(random.choice(act_cats.split(";")))
-                            else:
-                                label = int(act_cats)
+                    for ac, ac_150 in zip(acs, acs_150):
+                        for idx in range(self._num_clips):
+                            add_row(sequence_dir, idx, act, ac, ac_150, t_start, t_stop, dur)
 
-                        self._labels.append(label)
-                        self._spatial_temporal_idx.append(idx)
-                        self._clip_boundaries.append((float(t_start), float(t_stop)))
-                        self._video_duration.append(float(dur))
-                        self._video_meta.append({})
         assert (
                 len(self._path_to_sequence) > 0
         ), "Failed to load Amarv split {} from {}".format(
@@ -358,9 +395,9 @@ class Amarvtmp(torch.utils.data.Dataset):
             min_depth, max_depth = None, None
 
             if self.modality == "RGB":
-                video_path = os.path.join(video_dir, f"RGB_{pers}_Camera_640.mp4")
+                video_path = os.path.join(video_dir, f"RGB_{pers}_Camera_256.mp4")
             else:
-                prefix = f"Depth_{pers}_Camera_640"
+                prefix = f"Depth_{pers}_Camera_256"
                 for filename in os.listdir(video_dir):
                     if filename.startswith(prefix):
                         video_path = os.path.join(video_dir, filename)
@@ -401,12 +438,12 @@ class Amarvtmp(torch.utils.data.Dataset):
             )
 
             # for i in range(num_decode):
-            num_frames = np.array([self.cfg.DATA.NUM_FRAMES])
+            num_frames = [self.cfg.DATA.NUM_FRAMES]
             sampling_rate = np.array(utils.get_random_sampling_rate(
                 self.cfg.MULTIGRID.LONG_CYCLE_SAMPLING_RATE,
                 self.cfg.DATA.SAMPLING_RATE,
             ))
-            sampling_rate = np.array([sampling_rate])
+            sampling_rate = [sampling_rate]
             if len(num_frames) < num_decode:
                 num_frames.extend(
                     [
@@ -439,6 +476,9 @@ class Amarvtmp(torch.utils.data.Dataset):
                     0.0, self.cfg.DATA.TRAIN_JITTER_FPS
                 )
 
+            sampling_rate = np.array(sampling_rate)
+            num_frames = np.array(num_frames)
+
             # Decode video. Meta info is used to perform selective decoding.
             frames, time_idx, tdiff = decoder.decode(
                 video_container,
@@ -452,7 +492,7 @@ class Amarvtmp(torch.utils.data.Dataset):
                 target_fps=target_fps,
                 backend=self.cfg.DATA.DECODING_BACKEND,
                 use_offset=self.cfg.DATA.USE_OFFSET_SAMPLING,
-                max_spatial_scale=min_scale[0]
+                max_spatial_scale=min_scale[0] if self.cfg.DATA.ONLOAD_RESIZE else 0
                 if all(x == min_scale[0] for x in min_scale)
                 else 0,  # if self.mode in ["test"] else 0,
                 time_diff_prob=self.p_convert_dt
@@ -490,7 +530,7 @@ class Amarvtmp(torch.utils.data.Dataset):
             num_out = num_aug * num_decode
             f_out, time_idx_out = [None] * num_out, [None] * num_out
             idx = -1
-            label = self._labels[index]
+            label = self._labels_cats[index]
 
             for i in range(num_decode):
                 for _ in range(num_aug):
@@ -502,9 +542,9 @@ class Amarvtmp(torch.utils.data.Dataset):
 
                     if self.modality == "Depth":
                         # convert string to float (in meter)
-                        min_depth, max_depth = float(min_depth) / 1000, float(max_depth) / 1000
+                        cur_min, cur_max = float(min_depth) / 1000, float(max_depth) / 1000
                         f_out[idx] = transform.color_to_depth_realsense(
-                            f_out[idx], d_max=max_depth, d_min=min_depth)  # T H W 1
+                            f_out[idx], d_max=cur_min, d_min=cur_max)  # T H W 1
                     else:
                         f_out[idx] = f_out[idx] / 255.0
 

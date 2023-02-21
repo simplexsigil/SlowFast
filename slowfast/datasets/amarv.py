@@ -160,7 +160,6 @@ class Amarv(torch.utils.data.Dataset):
         self.chunk_epoch = 0
         self.epoch = 0.0
         self.skip_rows = self.cfg.DATA.SKIP_ROWS
-        use_act_cats = self.use_act_cats
 
         with pathmgr.open(path_to_file, "r") as f:
             print(f"Loading data for {path_to_file}")
@@ -543,9 +542,18 @@ class Amarv(torch.utils.data.Dataset):
 
                     if self.modality == "Depth":
                         # convert string to float (in meter)
-                        min_depth, max_depth = float(min_depth) / 1000, float(max_depth) / 1000
+                        cur_min, cur_max = float(min_depth) / 1000, float(max_depth) / 1000
+
+                        # Convert RGB to disparity value
                         f_out[idx] = transform.color_to_depth_realsense(
-                            f_out[idx], d_max=max_depth, d_min=min_depth)  # T H W 1
+                            f_out[idx], d_max=cur_max, d_min=cur_min)  # T H W 1
+
+                        # Min-max normalization => [0, 1]
+                        min_max_fn = transform.DepthNorm(
+                            max_depth=self.cfg.DATA.MAX_DEPTH,
+                            min_depth=self.cfg.DATA.MIN_DEPTH,
+                        )
+                        f_out[idx] = min_max_fn(f_out[idx])
                     else:
                         f_out[idx] = f_out[idx] / 255.0
 

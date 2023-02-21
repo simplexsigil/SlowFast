@@ -9,4 +9,6 @@ def add_custom_config(_C):
     _C.DATA.PATH_CACHE = False
     _C.DATA.ONLOAD_RESIZE = True  # Whether to automatically resize with ffmpeg when using torchvision.
     _C.DATA.MODALITY = "RGB"  # input modality, RGB or Depth
+    _C.DATA.MAX_DEPTH = 0.659631  # Max disparity value in the dataset
+    _C.DATA.MIN_DEPTH = 0.089223  # Min disparity value in the dataset
     pass

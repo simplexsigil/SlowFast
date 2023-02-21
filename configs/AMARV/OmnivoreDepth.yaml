@@ -1,14 +1,14 @@
 TRAIN:
   ENABLE: True
-  DATASET: Amarvtmp
+  DATASET: Amarv
   BATCH_SIZE: 4
   EVAL_PERIOD: 10
   CHECKPOINT_PERIOD: 5
   AUTO_RESUME: False
   MIXED_PRECISION: True
 DATA:
-  PATH_TO_DATA_DIR: /hkfs/work/workspace/scratch/kf3609-datasets/AMARV_tmp/run4_2023_01_27 # /hkfs/work/workspace/scratch/kf3609-datasets/AMARV/annotations/run4_2023_01_27
-  PATH_PREFIX: /hkfs/work/workspace/scratch/kf3609-datasets/AMARV_tmp/run4_2023_01_27  # /hkfs/work/workspace/scratch/kf3609-datasets/AMARV/run4_2023_01_27/
+  PATH_TO_DATA_DIR: "$AMARV_ANNS"
+  PATH_PREFIX: "$AMARV_RUN1"
   PATH_LABEL_SEPARATOR: ","
   NUM_FRAMES: 16
   SAMPLING_RATE: 4
@@ -21,8 +21,10 @@ DATA:
   TRAIN_JITTER_SCALES_RELATIVE: [0.08, 1.0]
   TRAIN_JITTER_ASPECT_RELATIVE: [0.75, 1.3333]
   MODALITY: Depth
-  MEAN: [null]
-  STD: [null]
+  MAX_DEPTH: 0.659631
+  MIN_DEPTH: 0.089223
+  MEAN: [0.423029]
+  STD: [0.213562]
 AUG:
   NUM_SAMPLE: 2
   ENABLE: True
@@ -44,20 +46,19 @@ SOLVER:
   ZERO_WD_1D_PARAM: True
   BASE_LR_SCALE_NUM_SHARDS: True
   CLIP_GRAD_L2NORM: 1.0
-  BASE_LR: 0.0001
+  BASE_LR: 0.001
   COSINE_AFTER_WARMUP: True
   COSINE_END_LR: 1e-6
   WARMUP_START_LR: 1e-6
-  WARMUP_EPOCHS: 30.0
+  WARMUP_EPOCHS: 5.0
   LR_POLICY: cosine
-  MAX_EPOCH: 200
+  MAX_EPOCH: 15
   MOMENTUM: 0.9
   WEIGHT_DECAY: 0.05
   OPTIMIZING_METHOD: adamw
 MODEL:
   FP16_ALLREDUCE: True
-  NUM_CLASSES: 9737
-  ARCH: mvit
+  NUM_CLASSES: 258
   MODEL_NAME: OmnivoreDepth
   LOSS_FUNC: soft_cross_entropy
   DROPOUT_RATE: 0.5
