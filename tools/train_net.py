@@ -32,6 +32,11 @@ from slowfast.utils.multigrid import MultigridSchedule
 
 logger = logging.get_logger(__name__)
 
+import os
+
+#print(f"CPU Count: {os.cpu_count()}")
+torch.set_num_threads(os.cpu_count())
+#print(f"Num threads: {torch.get_num_threads()}")
 
 def train_epoch(
     train_loader,
@@ -519,6 +524,8 @@ def train(cfg):
         cfg (CfgNode): configs. Details can be found in
             slowfast/config/defaults.py
     """
+    print(torch.get_num_threads())
+
     # Set up environment.
     du.init_distributed_training(cfg)
     # Set random seed from configs.

@@ -574,6 +574,7 @@ def decode(
             )
     except Exception as e:
         print("Failed to decode by {} with exception: {}".format(backend, e))
+        print(e)
         return None, None, None
 
     # Return None if the frames was not decoded successfully.
