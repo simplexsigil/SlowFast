@@ -75,7 +75,7 @@ SOLVER:
   WEIGHT_DECAY: 0.05
   OPTIMIZING_METHOD: adamw
 MODEL:
-  NUM_CLASSES: 9737
+  NUM_CLASSES: 271
   ARCH: mvit
   MODEL_NAME: MViT
   LOSS_FUNC: soft_cross_entropy # default cross_entropy
@@ -83,7 +83,7 @@ MODEL:
   FP16_ALLREDUCE: True
 TEST:
   ENABLE: True
-  DATASET: kinetics
+  DATASET: AMARV
   BATCH_SIZE: 64
   NUM_SPATIAL_CROPS: 3
   NUM_TEMPORAL_CLIPS: [5, 7, 10]
