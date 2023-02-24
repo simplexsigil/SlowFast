@@ -393,7 +393,7 @@ class Amarvtmp(torch.utils.data.Dataset):
             pers = random.choice(["Front", "Left", "Back", "Right"])
             video_dir = os.path.join(self._path_to_sequence[index], "Videos")
             min_depth, max_depth = None, None
-
+            video_path = None
             if self.modality == "RGB":
                 video_path = os.path.join(video_dir, f"RGB_{pers}_Camera_256.mp4")
             else:
@@ -403,6 +403,10 @@ class Amarvtmp(torch.utils.data.Dataset):
                         video_path = os.path.join(video_dir, filename)
                         min_depth, max_depth = filename.replace(".mp4", "").split('_')[-2:]
                         break
+
+            # Maybe some perspectives are missing
+            if video_path is None:
+                continue
 
             video_container = None
             try:
@@ -544,7 +548,7 @@ class Amarvtmp(torch.utils.data.Dataset):
                         # convert string to float (in meter)
                         cur_min, cur_max = float(min_depth) / 1000, float(max_depth) / 1000
                         f_out[idx] = transform.color_to_depth_realsense(
-                            f_out[idx], d_max=cur_min, d_min=cur_max)  # T H W 1
+                            f_out[idx], d_max=cur_max, d_min=cur_min)  # T H W 1
                     else:
                         f_out[idx] = f_out[idx] / 255.0
 

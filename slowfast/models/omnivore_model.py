@@ -44,8 +44,10 @@ def get_kinetics_head(dim_in: int = 1024, num_classes: int = 400) -> nn.Module:
 
 @MODEL_REGISTRY.register()
 class OmnivoreDepth(nn.Module):
+    """Omnivore depth model adapted to the slowfast repo."""
     def __init__(self, cfg):
         super().__init__()
+        self.cfg = cfg
         self.trunk = omnivore_swinB_depth(load_heads=False)
         self.head = nn.Linear(
             in_features=1024, out_features=cfg.MODEL.NUM_CLASSES)
@@ -58,11 +60,18 @@ class OmnivoreDepth(nn.Module):
         return self.head(features)
 
     def _freeze_fn(self):
-        unfreeze_modules = ['patch_embed', 'depth_patch_embed']
-        for name, param in self.trunk.named_parameters():
-            if name.split('.')[0] in unfreeze_modules:
-                continue
-            param.requires_grad = False
+        frozen_stages = self.cfg.MODEL.OMNIVORE_FROZEN_STAGE,
+        if frozen_stages == 0:
+            # Only patch embed and classifier are trainable
+            unfreeze_modules = ['patch_embed', 'depth_patch_embed']
+            for name, param in self.trunk.named_parameters():
+                if name.split('.')[0] in unfreeze_modules:
+                    continue
+                param.requires_grad = False
+        elif frozen_stages > 0:
+            # Only classifier is trainable
+            for name, param in self.trunk.named_parameters():
+                param.requires_grad = False
 
 
 class OmnivoreModel(nn.Module):

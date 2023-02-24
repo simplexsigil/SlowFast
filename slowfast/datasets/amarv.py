@@ -393,6 +393,7 @@ class Amarv(torch.utils.data.Dataset):
             pers = random.choice(["Front", "Left", "Back", "Right"])
             video_dir = os.path.join(self._path_to_sequence[index], "Videos")
             min_depth, max_depth = None, None
+            video_path = None
 
             if self.modality == "RGB":
                 video_path = os.path.join(video_dir, f"RGB_{pers}_Camera_256.mp4")
@@ -403,6 +404,10 @@ class Amarv(torch.utils.data.Dataset):
                         video_path = os.path.join(video_dir, filename)
                         min_depth, max_depth = filename.replace(".mp4", "").split('_')[-2:]
                         break
+
+            # Maybe some perspectives are missing
+            if video_path is None:
+                continue
 
             video_container = None
             try:

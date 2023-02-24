@@ -3,6 +3,10 @@
 
 """Wrapper to train and test a video classification model."""
 import warnings
+
+import torch
+import os
+
 warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._functional_video.*")
 
 from slowfast.config.defaults import assert_and_infer_cfg
@@ -13,6 +17,8 @@ from demo_net import demo
 from test_net import test
 from train_net import train
 from visualization import visualize
+
+torch.set_num_threads(os.cpu_count())
 
 
 def main():

@@ -11,4 +11,5 @@ def add_custom_config(_C):
     _C.DATA.MODALITY = "RGB"  # input modality, RGB or Depth
     _C.DATA.MAX_DEPTH = 0.659631  # Max disparity value in the dataset
     _C.DATA.MIN_DEPTH = 0.089223  # Min disparity value in the dataset
+    _C.MODEL.OMNIVORE_FROZEN_STAGE = 0  # 0 means only patch embed and classifier are trainable
     pass

@@ -1222,13 +1222,15 @@ def color_to_depth_realsense(
         color_img: torch.Tensor, d_max, d_min,
         inverse_colorization=True,
         return_disparity=True,
+        minimum_depth=1,
 ):
     """Convert rgb value to quantization 0-1529 value
     Reference:
         1) https://dev.intelrealsense.com/docs/depth-image-compression-by-colorization-for-intel-realsense-depth-cameras
     """
-    if d_min <= 0:
-        raise ValueError('d_min should greater than 0.')
+    # More than 95% videos have a larger d_min than 1 meter
+    # clamp it to prevent ZeroDivisionError
+    d_min = max(d_min, minimum_depth)
 
     if color_img.dtype == torch.uint8:
         color_img = color_img.float()
@@ -1293,15 +1295,12 @@ class DepthNorm(torch.nn.Module):
         super().__init__()
         self.max_depth = max_depth
         self.min_depth = min_depth
+        self.no_need_calc = max_depth == 1.0 and min_depth == 0.0
         self.denominator = max_depth - min_depth
 
     def __call__(self, input: torch.Tensor):
-        T, H, W, C = input.shape
-        if C != 1:
-            err_msg = (
-                f"This transform is for 1 channel Depth input only; got {input.shape}"
-            )
-            raise ValueError(err_msg)
+        if self.no_need_calc:
+            return input
 
         return input.sub_(self.min_depth).div_(self.denominator)
 
