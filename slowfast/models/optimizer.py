@@ -196,12 +196,13 @@ def get_param_groups(model, cfg):
             skip = model.no_weight_decay()
 
     for name, p in model.named_parameters():
-        if re.match(cfg.TRAIN.FREEZE_PAT, name):
+        if not re.match(cfg.TRAIN.UNFREEZE_PAT, name):
             p.requires_grad = False
 
         if not p.requires_grad:
             group_name = "no_grad"
             no_grad_parameters_count += 1
+            print(f"{name:<40} {p.requires_grad!s:>4}")
             continue
         name = name[len("module.") :] if name.startswith("module.") else name
         if name in skip or (
@@ -212,11 +213,13 @@ def get_param_groups(model, cfg):
             group_name = "layer_%d_%s" % (layer_id, "zero")
             weight_decay = 0.0
             zero_parameters_count += 1
+            print(f"{name:<40} {p.requires_grad!s:>4} Zero WD")
         else:
             layer_id, layer_decay = _get_layer_decay(name)
             group_name = "layer_%d_%s" % (layer_id, "non_bn")
             weight_decay = cfg.SOLVER.WEIGHT_DECAY
             non_bn_parameters_count += 1
+            print(f"{name:<40} {p.requires_grad!s:>4}")
 
         if group_name not in parameter_group_names:
             parameter_group_names[group_name] = {
