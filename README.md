@@ -30,7 +30,7 @@ The goal of PySlowFast is to provide a high-performance, light-weight pytorch co
 - MViTv1 and MViTv2
 - Rev-ViT and Rev-MViT
 ## I3D feature path, please use img_0016.t7 as the main feature under each folder for feature space analysis
- - /pfs/work7/workspace/scratch/kf3609-datasets/AMARV/I3D_feature_UDA3/run4_2023_02_11
+ - /lsdf/data/activity/AMARV/features/I3D/run4_2023_02_11
 ## Updates
  - We now [Reversible Vision Transformers](https://openaccess.thecvf.com/content/CVPR2022/papers/Mangalam_Reversible_Vision_Transformers_CVPR_2022_paper.pdf). Both Reversible ViT and MViT models released. See [`projects/rev`](./projects/rev/README.md).
  - We now support [MAE for Video](https://arxiv.org/abs/2104.11227.pdf). See [`projects/mae`](./projects/mae/README.md) for more information.
