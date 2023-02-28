@@ -47,9 +47,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
     test_meter.iter_tic()
 
     for cur_iter, (inputs, labels, video_idx, time, meta) in enumerate(
-        test_loader
-    ):
-
+            test_loader
+            ):
         if cfg.NUM_GPUS:
             # Transfer the data to the current GPU device.
             if isinstance(inputs, (list,)):
@@ -113,7 +112,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             probs = torch.mul(
                 retrieval_one_hot.view(batchSize, -1, C),
                 yd_transform.view(batchSize, -1, 1),
-            )
+                )
             preds = torch.sum(probs, 1)
         else:
             # Perform the forward pass.
@@ -132,7 +131,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             # Update and log stats.
             test_meter.update_stats(
                 preds.detach(), labels.detach(), video_idx.detach()
-            )
+                )
         test_meter.log_iter_stats(cur_iter)
 
         test_meter.iter_tic()
@@ -156,7 +155,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
 
             logger.info(
                 "Successfully saved prediction results to {}".format(save_path)
-            )
+                )
 
     test_meter.finalize_metrics()
     return test_meter
@@ -183,7 +182,6 @@ def test(cfg):
 
     test_meters = []
     for num_view in cfg.TEST.NUM_TEMPORAL_CLIPS:
-
         cfg.TEST.NUM_ENSEMBLE_VIEWS = num_view
 
         # Print config.
@@ -197,14 +195,14 @@ def test(cfg):
             model.eval()
             flops, params = misc.log_model_info(
                 model, cfg, use_train_input=False
-            )
+                )
 
         if du.is_master_proc() and cfg.LOG_MODEL_INFO:
             misc.log_model_info(model, cfg, use_train_input=False)
         if (
-            cfg.TASK == "ssl"
-            and cfg.MODEL.MODEL_NAME == "ContrastiveModel"
-            and cfg.CONTRASTIVE.KNN_ON
+                cfg.TASK == "ssl"
+                and cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                and cfg.CONTRASTIVE.KNN_ON
         ):
             train_loader = loader.construct_loader(cfg, "train")
             if hasattr(model, "module"):
@@ -223,9 +221,9 @@ def test(cfg):
             test_meter = AVAMeter(len(test_loader), cfg, mode="test")
         else:
             assert (
-                test_loader.dataset.num_videos
-                % (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS)
-                == 0
+                    test_loader.dataset.num_videos
+                    % (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS)
+                    == 0
             )
             # Create meters for multi-view testing.
             test_meter = TestMeter(
@@ -238,12 +236,12 @@ def test(cfg):
                 len(test_loader),
                 cfg.DATA.MULTI_LABEL,
                 cfg.DATA.ENSEMBLE_METHOD,
-            )
+                )
 
         # Set up writer for logging to Tensorboard format.
         if cfg.TENSORBOARD.ENABLE and du.is_master_proc(
-            cfg.NUM_GPUS * cfg.NUM_SHARDS
-        ):
+                cfg.NUM_GPUS * cfg.NUM_SHARDS
+                ):
             writer = tb.TensorboardWriter(cfg)
         else:
             writer = None
@@ -260,11 +258,11 @@ def test(cfg):
         logger.info(
             "Finalized testing with {} temporal clips and {} spatial crops".format(
                 view, cfg.TEST.NUM_SPATIAL_CROPS
+                )
             )
-        )
         result_string_views += "_{}a{}" "".format(
             view, test_meter.stats["top1_acc"]
-        )
+            )
 
         result_string = (
             "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}"
@@ -276,9 +274,10 @@ def test(cfg):
                 test_meter.stats["top5_acc"],
                 misc.gpu_mem_usage(),
                 flops,
-            )
+                )
         )
 
         logger.info("{}".format(result_string))
+
     logger.info("{}".format(result_string_views))
     return result_string + " \n " + result_string_views
