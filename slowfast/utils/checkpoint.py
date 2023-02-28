@@ -105,14 +105,14 @@ def is_checkpoint_epoch(cfg, cur_epoch, multigrid_schedule=None):
             if cur_epoch < s[-1]:
                 period = max(
                     (s[-1] - prev_epoch) // cfg.MULTIGRID.EVAL_FREQ + 1, 1
-                )
+                    )
                 return (s[-1] - 1 - cur_epoch) % period == 0
             prev_epoch = s[-1]
 
     return (cur_epoch + 1) % cfg.TRAIN.CHECKPOINT_PERIOD == 0
 
 
-def save_checkpoint(path_to_job, model, optimizer, epoch, cfg, scaler=None):
+def save_checkpoint(path_to_job, model, optimizer, epoch, cfg, scaler=None, val_stats=None):
     """
     Save a checkpoint.
     Args:
@@ -122,6 +122,8 @@ def save_checkpoint(path_to_job, model, optimizer, epoch, cfg, scaler=None):
         cfg (CfgNode): configs to save.
         scaler (GradScaler): the mixed precision scale.
     """
+    val_stats = {} if val_stats is None else val_stats
+
     # Save checkpoints only from the master process.
     if not du.is_master_proc(cfg.NUM_GPUS * cfg.NUM_SHARDS):
         return
@@ -133,17 +135,20 @@ def save_checkpoint(path_to_job, model, optimizer, epoch, cfg, scaler=None):
 
     # Record the state.
     checkpoint = {
-        "epoch": epoch,
-        "model_state": normalized_sd,
+        "epoch":           epoch,
+        "model_state":     normalized_sd,
         "optimizer_state": optimizer.state_dict(),
-        "cfg": cfg.dump(),
-    }
+        "cfg":             cfg.dump(),
+        }
+
+    checkpoint.update(val_stats)
+
     if scaler is not None:
         checkpoint["scaler_state"] = scaler.state_dict()
     # Write the checkpoint.
     path_to_checkpoint = get_path_to_checkpoint(
         path_to_job, epoch + 1, cfg.TASK
-    )
+        )
     with pathmgr.open(path_to_checkpoint, "wb") as f:
         torch.save(checkpoint, f)
     return path_to_checkpoint
@@ -169,12 +174,12 @@ def inflate_weight(state_dict_2d, state_dict_3d):
         if len(v2d.shape) == 4 and len(v3d.shape) == 5:
             logger.info(
                 "Inflate {}: {} -> {}: {}".format(k, v2d.shape, k, v3d.shape)
-            )
+                )
             # Dimension need to be match.
             assert v2d.shape[-2:] == v3d.shape[-2:]
             assert v2d.shape[:2] == v3d.shape[:2]
             v3d = (
-                v2d.unsqueeze(2).repeat(1, 1, v3d.shape[2], 1, 1) / v3d.shape[2]
+                    v2d.unsqueeze(2).repeat(1, 1, v3d.shape[2], 1, 1) / v3d.shape[2]
             )
         elif v2d.shape == v3d.shape:
             v3d = v2d
@@ -182,24 +187,24 @@ def inflate_weight(state_dict_2d, state_dict_3d):
             logger.info(
                 "Unexpected {}: {} -|> {}: {}".format(
                     k, v2d.shape, k, v3d.shape
+                    )
                 )
-            )
         state_dict_inflated[k] = v3d.clone()
     return state_dict_inflated
 
 
 def load_checkpoint(
-    path_to_checkpoint,
-    model,
-    data_parallel=True,
-    optimizer=None,
-    scaler=None,
-    inflation=False,
-    convert_from_caffe2=False,
-    epoch_reset=False,
-    clear_name_pattern=(),
-    image_init=False,
-):
+        path_to_checkpoint,
+        model,
+        data_parallel=True,
+        optimizer=None,
+        scaler=None,
+        inflation=False,
+        convert_from_caffe2=False,
+        epoch_reset=False,
+        clear_name_pattern=(),
+        image_init=False,
+        ):
     """
     Load the checkpoint from the given file. If inflation is True, inflate the
     2D Conv weights from the checkpoint to 3D Conv.
@@ -238,36 +243,36 @@ def load_checkpoint(
                 # expand shape dims if they differ (eg for converting linear to conv params)
                 if len(c2_blob_shape) < len(model_blob_shape):
                     c2_blob_shape += (1,) * (
-                        len(model_blob_shape) - len(c2_blob_shape)
+                            len(model_blob_shape) - len(c2_blob_shape)
                     )
                     caffe2_checkpoint["blobs"][key] = np.reshape(
                         caffe2_checkpoint["blobs"][key], c2_blob_shape
-                    )
+                        )
                 # Load BN stats to Sub-BN.
                 if (
-                    len(model_blob_shape) == 1
-                    and len(c2_blob_shape) == 1
-                    and model_blob_shape[0] > c2_blob_shape[0]
-                    and model_blob_shape[0] % c2_blob_shape[0] == 0
+                        len(model_blob_shape) == 1
+                        and len(c2_blob_shape) == 1
+                        and model_blob_shape[0] > c2_blob_shape[0]
+                        and model_blob_shape[0] % c2_blob_shape[0] == 0
                 ):
                     caffe2_checkpoint["blobs"][key] = np.concatenate(
                         [caffe2_checkpoint["blobs"][key]]
                         * (model_blob_shape[0] // c2_blob_shape[0])
-                    )
+                        )
                     c2_blob_shape = caffe2_checkpoint["blobs"][key].shape
 
                 if c2_blob_shape == tuple(model_blob_shape):
                     state_dict[converted_key] = torch.tensor(
                         caffe2_checkpoint["blobs"][key]
-                    ).clone()
+                        ).clone()
                     logger.info(
                         "{}: {} => {}: {}".format(
                             key,
                             c2_blob_shape,
                             converted_key,
                             tuple(model_blob_shape),
+                            )
                         )
-                    )
                 else:
                     logger.warn(
                         "!! {}: {} does not match {}: {}".format(
@@ -275,17 +280,17 @@ def load_checkpoint(
                             c2_blob_shape,
                             converted_key,
                             tuple(model_blob_shape),
+                            )
                         )
-                    )
             else:
                 if not any(
-                    prefix in key for prefix in ["momentum", "lr", "model_iter"]
-                ):
+                        prefix in key for prefix in ["momentum", "lr", "model_iter"]
+                        ):
                     logger.warn(
                         "!! {}: can not be converted, got {}".format(
                             key, converted_key
+                            )
                         )
-                    )
         diff = set(ms.state_dict()) - set(state_dict)
         diff = {d for d in diff if "num_batches_tracked" not in d}
         if len(diff) > 0:
@@ -301,12 +306,12 @@ def load_checkpoint(
         )
         checkpoint["model_state"] = normal_to_sub_bn(
             checkpoint["model_state"], model_state_dict_3d
-        )
+            )
         if inflation:
             # Try to inflate the model.
             inflated_model_dict = inflate_weight(
                 checkpoint["model_state"], model_state_dict_3d
-            )
+                )
             ms.load_state_dict(inflated_model_dict, strict=False)
         else:
             if clear_name_pattern:
@@ -316,7 +321,7 @@ def load_checkpoint(
                         if item in k:
                             k_re = k.replace(
                                 item, "", 1
-                            )  # only repace first occurence of pattern
+                                )  # only repace first occurence of pattern
                             model_state_dict_new[k_re] = checkpoint[
                                 "model_state"
                             ][k]
@@ -332,55 +337,55 @@ def load_checkpoint(
 
             if image_init:
                 if (
-                    "pos_embed" in pre_train_dict.keys()
-                    and "pos_embed_xy" in model_dict.keys()
+                        "pos_embed" in pre_train_dict.keys()
+                        and "pos_embed_xy" in model_dict.keys()
                 ):
                     print(
                         pre_train_dict["pos_embed"].shape,
                         model_dict["pos_embed_xy"].shape,
                         model_dict["pos_embed_class"].shape,
-                    )
+                        )
                     if (
-                        pre_train_dict["pos_embed"].shape[1]
-                        == model_dict["pos_embed_xy"].shape[1] + 1
+                            pre_train_dict["pos_embed"].shape[1]
+                            == model_dict["pos_embed_xy"].shape[1] + 1
                     ):
                         pre_train_dict["pos_embed_xy"] = pre_train_dict[
-                            "pos_embed"
-                        ][:, 1:]
+                                                             "pos_embed"
+                                                         ][:, 1:]
                         pre_train_dict["pos_embed_class"] = pre_train_dict[
-                            "pos_embed"
-                        ][:, :1]
+                                                                "pos_embed"
+                                                            ][:, :1]
 
                 if (
-                    "patch_embed.proj.weight" in pre_train_dict.keys()
-                    and "patch_embed.proj.weight" in model_dict.keys()
+                        "patch_embed.proj.weight" in pre_train_dict.keys()
+                        and "patch_embed.proj.weight" in model_dict.keys()
                 ):
                     print(
                         pre_train_dict["patch_embed.proj.weight"].shape,
                         model_dict["patch_embed.proj.weight"].shape,
-                    )
+                        )
                     if (
-                        len(pre_train_dict["patch_embed.proj.weight"].shape)
-                        == 4
-                        and len(model_dict["patch_embed.proj.weight"].shape)
-                        == 5
+                            len(pre_train_dict["patch_embed.proj.weight"].shape)
+                            == 4
+                            and len(model_dict["patch_embed.proj.weight"].shape)
+                            == 5
                     ):  # img->video
                         t = model_dict["patch_embed.proj.weight"].shape[2]
                         pre_train_dict[
                             "patch_embed.proj.weight"
                         ] = pre_train_dict["patch_embed.proj.weight"][
                             :, :, None, :, :
-                        ].repeat(
+                            ].repeat(
                             1, 1, t, 1, 1
-                        )
+                            )
                         logger.info(
                             f"inflate patch_embed.proj.weight to {pre_train_dict['patch_embed.proj.weight'].shape}"
-                        )
+                            )
                     elif (
-                        len(pre_train_dict["patch_embed.proj.weight"].shape)
-                        == 5
-                        and len(model_dict["patch_embed.proj.weight"].shape)
-                        == 4
+                            len(pre_train_dict["patch_embed.proj.weight"].shape)
+                            == 5
+                            and len(model_dict["patch_embed.proj.weight"].shape)
+                            == 4
                     ):  # video->img
                         orig_shape = pre_train_dict[
                             "patch_embed.proj.weight"
@@ -390,74 +395,74 @@ def load_checkpoint(
                             "patch_embed.proj.weight"
                         ] = pre_train_dict["patch_embed.proj.weight"].sum(
                             2
-                        )  # take avg
+                            )  # take avg
                         logger.info(
                             f"deflate patch_embed.proj.weight from {orig_shape} to {pre_train_dict['patch_embed.proj.weight'].shape}"
-                        )
+                            )
                         if (
-                            "pos_embed_spatial" in pre_train_dict.keys()
-                            and "pos_embed" in model_dict.keys()
+                                "pos_embed_spatial" in pre_train_dict.keys()
+                                and "pos_embed" in model_dict.keys()
                         ):
                             pos_embds = pre_train_dict["pos_embed_spatial"]
                             if (
-                                "pos_embed_class" in pre_train_dict.keys()
-                                and pos_embds.shape
-                                != model_dict["pos_embed"].shape
+                                    "pos_embed_class" in pre_train_dict.keys()
+                                    and pos_embds.shape
+                                    != model_dict["pos_embed"].shape
                             ):
                                 pos_embds = torch.cat(
                                     [
                                         pre_train_dict["pos_embed_class"],
                                         pos_embds,
-                                    ],
+                                        ],
                                     1,
-                                )
+                                    )
                                 pre_train_dict.pop("pos_embed_class")
                             if pos_embds.shape == model_dict["pos_embed"].shape:
                                 pre_train_dict["pos_embed"] = pos_embds
                                 pre_train_dict.pop("pos_embed_spatial")
                                 logger.info(
                                     f"successful surgery of pos embed w/ shape {pos_embds.shape} "
-                                )
+                                    )
                             else:
                                 logger.info(
                                     f"UNSUCCESSFUL surgery of pos embed w/ shape {pos_embds.shape} "
-                                )
+                                    )
 
                 qkv = [
                     "attn.pool_k.weight",
                     "attn.pool_q.weight",
                     "attn.pool_v.weight",
-                ]
+                    ]
                 for k in pre_train_dict.keys():
                     if (
-                        any([x in k for x in qkv])
-                        and pre_train_dict[k].shape != model_dict[k].shape
+                            any([x in k for x in qkv])
+                            and pre_train_dict[k].shape != model_dict[k].shape
                     ):
                         # print(pre_train_dict[k].shape, model_dict[k].shape)
                         logger.info(
                             f"inflate {k} from {pre_train_dict[k].shape} to {model_dict[k].shape}"
-                        )
+                            )
                         t = model_dict[k].shape[2]
                         pre_train_dict[k] = pre_train_dict[k].repeat(
                             1, 1, t, 1, 1
-                        )
+                            )
 
                 for k in pre_train_dict.keys():
                     if (
-                        "rel_pos" in k
-                        and pre_train_dict[k].shape != model_dict[k].shape
+                            "rel_pos" in k
+                            and pre_train_dict[k].shape != model_dict[k].shape
                     ):
                         # print(pre_train_dict[k].shape, model_dict[k].shape)
                         logger.info(
                             f"interpolating {k} from {pre_train_dict[k].shape} to {model_dict[k].shape}"
-                        )
+                            )
                         new_pos_embed = torch.nn.functional.interpolate(
                             pre_train_dict[k]
                             .reshape(1, pre_train_dict[k].shape[0], -1)
                             .permute(0, 2, 1),
                             size=model_dict[k].shape[0],
                             mode="linear",
-                        )
+                            )
                         new_pos_embed = (
                             new_pos_embed.reshape(-1, model_dict[k].shape[0])
                             .permute(1, 0)
@@ -480,51 +485,51 @@ def load_checkpoint(
                                 v,
                                 size=model_dict[k].size()[0],
                                 mode="linear",
-                            )
+                                )
                             v = v[0].t()
                             pre_train_dict_match[k] = v
                             logger.info(
                                 "{} reshaped from {} to {}".format(
                                     k, v_shape, v.shape
+                                    )
                                 )
-                            )
                         elif "pos_embed_temporal" in k:
                             v_shape = v.shape
                             v = torch.nn.functional.interpolate(
                                 v.permute(0, 2, 1),
                                 size=model_dict[k].shape[1],
                                 mode="linear",
-                            )
+                                )
                             pre_train_dict_match[k] = v.permute(0, 2, 1)
                             logger.info(
                                 "{} reshaped from {} to {}".format(
                                     k, v_shape, pre_train_dict_match[k].shape
+                                    )
                                 )
-                            )
                         elif "pos_embed_spatial" in k:
                             v_shape = v.shape
                             pretrain_size = int(math.sqrt(v_shape[1]))
                             model_size = int(math.sqrt(model_dict[k].shape[1]))
                             assert pretrain_size * pretrain_size == v_shape[1]
                             assert (
-                                model_size * model_size
-                                == model_dict[k].shape[1]
+                                    model_size * model_size
+                                    == model_dict[k].shape[1]
                             )
                             v = torch.nn.functional.interpolate(
                                 v.reshape(
                                     1, pretrain_size, pretrain_size, -1
-                                ).permute(0, 3, 1, 2),
+                                    ).permute(0, 3, 1, 2),
                                 size=(model_size, model_size),
                                 mode="bicubic",
-                            )
+                                )
                             pre_train_dict_match[k] = v.reshape(
                                 1, -1, model_size * model_size
-                            ).permute(0, 2, 1)
+                                ).permute(0, 2, 1)
                             logger.info(
                                 "{} reshaped from {} to {}".format(
                                     k, v_shape, pre_train_dict_match[k].shape
+                                    )
                                 )
-                            )
                         else:
                             not_used_layers.append(k)
                 else:
@@ -534,7 +539,7 @@ def load_checkpoint(
                 k
                 for k in model_dict.keys()
                 if k not in pre_train_dict_match.keys()
-            ]
+                ]
             # Log weights that are not loaded with the pre-trained weights.
             if not_load_layers:
                 for k in not_load_layers:
@@ -545,7 +550,7 @@ def load_checkpoint(
             # Load pre-trained weights.
             missing_keys, unexpected_keys = ms.load_state_dict(
                 pre_train_dict_match, strict=False
-            )
+                )
 
             print("missing keys: {}".format(missing_keys))
             print("unexpected keys: {}".format(unexpected_keys))
@@ -583,7 +588,7 @@ def sub_to_normal_bn(sd):
         ("bn.bn.running_mean", "bn.running_mean"),
         ("bn.bn.running_var", "bn.running_var"),
         ("bn.split_bn.num_batches_tracked", "bn.num_batches_tracked"),
-    ]
+        ]
     to_remove = ["bn.bn.", ".split_bn."]
     for key in sd:
         for before, after in modifications:
@@ -647,21 +652,21 @@ def normal_to_sub_bn(checkpoint_sd, model_sd):
             c2_blob_shape = checkpoint_sd[key].shape
 
             if (
-                len(model_blob_shape) == 1
-                and len(c2_blob_shape) == 1
-                and model_blob_shape[0] > c2_blob_shape[0]
-                and model_blob_shape[0] % c2_blob_shape[0] == 0
+                    len(model_blob_shape) == 1
+                    and len(c2_blob_shape) == 1
+                    and model_blob_shape[0] > c2_blob_shape[0]
+                    and model_blob_shape[0] % c2_blob_shape[0] == 0
             ):
                 before_shape = checkpoint_sd[key].shape
                 checkpoint_sd[key] = torch.cat(
                     [checkpoint_sd[key]]
                     * (model_blob_shape[0] // c2_blob_shape[0])
-                )
+                    )
                 logger.info(
                     "{} {} -> {}".format(
                         key, before_shape, checkpoint_sd[key].shape
+                        )
                     )
-                )
     return checkpoint_sd
 
 
@@ -681,7 +686,7 @@ def load_test_checkpoint(cfg, model):
             None,
             inflation=False,
             convert_from_caffe2=cfg.TEST.CHECKPOINT_TYPE == "caffe2",
-        )
+            )
     elif has_checkpoint(cfg.OUTPUT_DIR):
         last_checkpoint = get_last_checkpoint(cfg.OUTPUT_DIR, cfg.TASK)
         load_checkpoint(last_checkpoint, model, cfg.NUM_GPUS > 1)
@@ -696,11 +701,11 @@ def load_test_checkpoint(cfg, model):
             None,
             inflation=False,
             convert_from_caffe2=cfg.TRAIN.CHECKPOINT_TYPE == "caffe2",
-        )
+            )
     else:
         logger.info(
             "Unknown way of loading checkpoint. Using with random initialization, only for debugging."
-        )
+            )
 
 
 def load_train_checkpoint(cfg, model, optimizer, scaler=None):
@@ -717,7 +722,7 @@ def load_train_checkpoint(cfg, model, optimizer, scaler=None):
             optimizer,
             scaler=scaler,
             clear_name_pattern=cfg.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN,
-        )
+            )
         start_epoch = checkpoint_epoch + 1
     elif cfg.TRAIN.CHECKPOINT_FILE_PATH != "":
         logger.info("Load from given checkpoint file.")
@@ -732,7 +737,7 @@ def load_train_checkpoint(cfg, model, optimizer, scaler=None):
             epoch_reset=cfg.TRAIN.CHECKPOINT_EPOCH_RESET,
             clear_name_pattern=cfg.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN,
             image_init=cfg.TRAIN.CHECKPOINT_IN_INIT,
-        )
+            )
         start_epoch = checkpoint_epoch + 1
     else:
         start_epoch = 0
