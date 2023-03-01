@@ -13,15 +13,19 @@ import slowfast.utils.logging as logging
 from slowfast.utils.env import pathmgr
 
 from . import utils as utils
+from . import transform as transform
 from .build import DATASET_REGISTRY
 
 logger = logging.get_logger(__name__)
 
 
 @DATASET_REGISTRY.register()
-class Ssv2(torch.utils.data.Dataset):
+class Nturgbd(torch.utils.data.Dataset):
     """
-    Something-Something v2 (SSV2) video loader. Construct the SSV2 video loader,
+    This dataloader expects pre-extracted depth frames as input,
+    similar to SSV2 dataloader.
+
+    NTU RGBD video loader. Construct the NTU RGB+D video loader,
     then sample clips from the videos. For training and validation, a single
     clip is randomly sampled from every video with random cropping, scaling, and
     flipping. For testing, multiple clips are uniformaly sampled from every
@@ -32,9 +36,9 @@ class Ssv2(torch.utils.data.Dataset):
 
     def __init__(self, cfg, mode, num_retries=10):
         """
-        Load Something-Something V2 data (frame paths, labels, etc. ) to a given
-        Dataset object. The dataset could be downloaded from Something-Something
-        official website (https://20bn.com/datasets/something-something).
+        Load NTU RGB+D data (frame paths, labels, etc. ) to a given
+        Dataset object. The dataset could be downloaded from
+        official website (https://rose1.ntu.edu.sg/dataset/actionRecognition/).
         Please see datasets/DATASET.md for more information about the data format.
         Args:
             cfg (CfgNode): configs.
@@ -50,9 +54,13 @@ class Ssv2(torch.utils.data.Dataset):
             "train",
             "val",
             "test",
-        ], "Split '{}' not supported for Something-Something V2".format(mode)
+        ], "Split '{}' not supported for NTU RGB+D".format(mode)
         self.mode = mode
         self.cfg = cfg
+        self.modality = self.cfg.DATA.MODALITY
+        if self.modality != 'Depth':
+            raise NotImplementedError(
+                f'{self.modality} is currently not supported by this dataloader.')
 
         self._video_meta = {}
         self._num_retries = num_retries
@@ -67,7 +75,7 @@ class Ssv2(torch.utils.data.Dataset):
                 cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS
             )
 
-        logger.info("Constructing Something-Something V2 {}...".format(mode))
+        logger.info("Constructing NTU RGB+D {}...".format(mode))
         self._construct_loader()
 
         self.aug = False
@@ -84,16 +92,6 @@ class Ssv2(torch.utils.data.Dataset):
         """
         Construct the video loader.
         """
-        # Loading label names.
-        with pathmgr.open(
-            os.path.join(
-                self.cfg.DATA.PATH_TO_DATA_DIR,
-                "labels.json",
-            ),
-            "r",
-        ) as f:
-            label_dict = json.load(f)
-
         # Loading labels.
         label_file = os.path.join(
             self.cfg.DATA.PATH_TO_DATA_DIR,
@@ -104,28 +102,27 @@ class Ssv2(torch.utils.data.Dataset):
         with pathmgr.open(label_file, "r") as f:
             label_json = json.load(f)
 
+        # Select the corresponding split: cross subject or cross view
+        label_json = label_json[self.cfg.DATA.NTU_SPLIT]
+
         self._video_names = []
         self._labels = []
         for video in label_json:
             video_name = video["id"]
-            template = video["template"]
-            template = template.replace("[", "")
-            template = template.replace("]", "")
-            label = int(label_dict[template])
+            label = video["label"]
             self._video_names.append(video_name)
             self._labels.append(label)
 
-        path_to_file = os.path.join(
+        # Loading path to file
+        video_path_file = os.path.join(
             self.cfg.DATA.PATH_TO_DATA_DIR,
-            "{}.csv".format("train" if self.mode == "train" else "val"),
+            "path_to_{}_{}_videos.json".format(
+                "train" if self.mode == "train" else "validation",
+                self.cfg.DATA.NTU_SPLIT,
+            ),
         )
-        assert pathmgr.exists(path_to_file), "{} dir not found".format(
-            path_to_file
-        )
-
-        self._path_to_videos, _ = utils.load_image_lists(
-            path_to_file, self.cfg.DATA.PATH_PREFIX
-        )
+        with pathmgr.open(video_path_file, "r") as f:
+            self._path_to_videos = json.load(f)
 
         assert len(self._path_to_videos) == len(self._video_names), (
             len(self._path_to_videos),
@@ -160,9 +157,9 @@ class Ssv2(torch.utils.data.Dataset):
             )
         )
         logger.info(
-            "Something-Something V2 dataloader constructed "
+            "NTURGBD dataloader constructed "
             " (size: {}) from {}".format(
-                len(self._path_to_videos), path_to_file
+                len(self._path_to_videos), video_path_file
             )
         )
 
@@ -176,6 +173,7 @@ class Ssv2(torch.utils.data.Dataset):
         """
         num_frames = self.cfg.DATA.NUM_FRAMES
         video_length = len(self._path_to_videos[index])
+        assert video_length > 0
 
         seg_size = float(video_length - 1) / num_frames
         seq = []
@@ -256,8 +254,20 @@ class Ssv2(torch.utils.data.Dataset):
             utils.retry_load_images(
                 [self._path_to_videos[index][frame] for frame in seq],
                 self._num_retries,
+                is_depth=(self.modality == "Depth"),
             )
         )
+
+        # Use disparity instead of depth (in meter).
+        frames[frames == 0] = float("inf")
+        frames = 1000 / frames
+
+        # Min-max normalization => [0, 1]
+        min_max_fn = transform.DepthNorm(
+            max_depth=self.cfg.DATA.MAX_DEPTH,
+            min_depth=self.cfg.DATA.MIN_DEPTH,
+        )
+        frames = min_max_fn(frames)
 
         if self.aug:
             if self.cfg.AUG.NUM_SAMPLE > 1:

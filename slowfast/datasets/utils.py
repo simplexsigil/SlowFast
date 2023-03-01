@@ -7,6 +7,7 @@ import random
 import time
 from collections import defaultdict
 import cv2
+from PIL import Image
 import torch
 from torch.utils.data.distributed import DistributedSampler
 
@@ -23,7 +24,7 @@ from .transform import create_random_augment
 logger = logging.getLogger(__name__)
 
 
-def retry_load_images(image_paths, retry=10, backend="pytorch"):
+def retry_load_images(image_paths, retry=10, backend="pytorch", is_depth=False):
     """
     This function is to load images with support of retrying for failed load.
 
@@ -38,9 +39,14 @@ def retry_load_images(image_paths, retry=10, backend="pytorch"):
     for i in range(retry):
         imgs = []
         for image_path in image_paths:
-            with pathmgr.open(image_path, "rb") as f:
-                img_str = np.frombuffer(f.read(), np.uint8)
-                img = cv2.imdecode(img_str, flags=cv2.IMREAD_COLOR)
+            # If is depth, then it should be a float array
+            if is_depth:
+                with Image.open(image_path) as f:
+                    img = np.array(f, dtype=np.float32)[..., None]
+            else:
+                with pathmgr.open(image_path, "rb") as f:
+                    img_str = np.frombuffer(f.read(), np.uint8)
+                    img = cv2.imdecode(img_str, flags=cv2.IMREAD_COLOR)
             imgs.append(img)
 
         if all(img is not None for img in imgs):
@@ -392,6 +398,7 @@ def aug_frame(
             input_size=(frames.size(1), frames.size(2)),
             auto_augment=cfg.AUG.AA_TYPE,
             interpolation=cfg.AUG.INTERPOLATION,
+            is_depth=(cfg.DATA.MODALITY == "Depth"),
         )
         # T H W C -> T C H W.
         frames = frames.permute(0, 3, 1, 2)

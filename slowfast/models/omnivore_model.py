@@ -60,7 +60,7 @@ class OmnivoreDepth(nn.Module):
         return self.head(features)
 
     def _freeze_fn(self):
-        frozen_stages = self.cfg.MODEL.OMNIVORE_FROZEN_STAGE,
+        frozen_stages = self.cfg.MODEL.OMNIVORE_FROZEN_STAGE
         if frozen_stages == 0:
             # Only patch embed and classifier are trainable
             unfreeze_modules = ['patch_embed', 'depth_patch_embed']
@@ -68,10 +68,15 @@ class OmnivoreDepth(nn.Module):
                 if name.split('.')[0] in unfreeze_modules:
                     continue
                 param.requires_grad = False
-        elif frozen_stages > 0:
+        elif frozen_stages == 1:
             # Only classifier is trainable
             for name, param in self.trunk.named_parameters():
                 param.requires_grad = False
+        elif frozen_stages == 2:
+            pass
+        else:
+            raise NotImplementedError(
+                f"Frozen stage {frozen_stages} for OmnivoreDepth not supported.")
 
 
 class OmnivoreModel(nn.Module):
