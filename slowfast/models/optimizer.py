@@ -4,7 +4,7 @@
 """Optimizer."""
 
 import torch
-
+import re
 import slowfast.utils.lr_policy as lr_policy
 
 
@@ -39,22 +39,33 @@ def construct_optimizer(model, cfg):
             if hasattr(model, "no_weight_decay"):
                 skip = model.no_weight_decay()
 
+        print("Model Parameter Optimization:")
         for name_m, m in model.named_modules():
             is_bn = isinstance(m, torch.nn.modules.batchnorm._NormBase)
             for name_p, p in m.named_parameters(recurse=False):
                 name = "{}.{}".format(name_m, name_p).strip(".")
+
+                if not re.match(cfg.TRAIN.UNFREEZE_PAT, name):
+                    p.requires_grad = False
+
                 if not p.requires_grad:
                     no_grad_parameters.append(p)
+
+                    print(f"{name:<40} {p.requires_grad!s:>4}")
                 elif is_bn:
                     bn_parameters.append(p)
+                    print(f"{name:<40} {p.requires_grad!s:>4} BN")
                 elif any(k in name for k in skip):
                     zero_parameters.append(p)
+                    print(f"{name:<40} {p.requires_grad!s:>4} Zero WD")
                 elif cfg.SOLVER.ZERO_WD_1D_PARAM and (
                     len(p.shape) == 1 or name.endswith(".bias")
                 ):
                     zero_parameters.append(p)
+                    print(f"{name:<40} {p.requires_grad!s:>4} Zero WD")
                 else:
                     non_bn_parameters.append(p)
+                    print(f"{name:<40} {p.requires_grad!s:>4}")
 
         optim_params = [
             {
@@ -185,9 +196,13 @@ def get_param_groups(model, cfg):
             skip = model.no_weight_decay()
 
     for name, p in model.named_parameters():
+        if not re.match(cfg.TRAIN.UNFREEZE_PAT, name):
+            p.requires_grad = False
+
         if not p.requires_grad:
             group_name = "no_grad"
             no_grad_parameters_count += 1
+            print(f"{name:<40} {p.requires_grad!s:>4}")
             continue
         name = name[len("module.") :] if name.startswith("module.") else name
         if name in skip or (
@@ -198,11 +213,13 @@ def get_param_groups(model, cfg):
             group_name = "layer_%d_%s" % (layer_id, "zero")
             weight_decay = 0.0
             zero_parameters_count += 1
+            print(f"{name:<40} {p.requires_grad!s:>4} Zero WD")
         else:
             layer_id, layer_decay = _get_layer_decay(name)
             group_name = "layer_%d_%s" % (layer_id, "non_bn")
             weight_decay = cfg.SOLVER.WEIGHT_DECAY
             non_bn_parameters_count += 1
+            print(f"{name:<40} {p.requires_grad!s:>4}")
 
         if group_name not in parameter_group_names:
             parameter_group_names[group_name] = {
@@ -263,7 +280,7 @@ def set_lr(optimizer, new_lr):
         new_lr (float): the new learning rate to set.
     """
     for param_group in optimizer.param_groups:
-        param_group["lr"] = new_lr * param_group["layer_decay"]
+        param_group["lr"] = new_lr * (param_group["layer_decay"] if "layer_decay" in param_group else 1.)
 
 
 class LARS(object):

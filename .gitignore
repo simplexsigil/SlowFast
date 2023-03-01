@@ -13,3 +13,4 @@ old_checkpoints
 **/*.csv
 **/*.pyc
 tmp.py
+dist

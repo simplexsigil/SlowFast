@@ -18,8 +18,12 @@ from test_net import test
 from train_net import train
 from visualization import visualize
 
-torch.set_num_threads(os.cpu_count())
+import torch
+import os
 
+# print(f"CPU Count: {os.cpu_count()}")
+torch.set_num_threads(os.cpu_count())
+# print(f"Num threads: {torch.get_num_threads()}")
 
 def main():
     """

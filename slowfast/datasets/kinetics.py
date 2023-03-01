@@ -39,7 +39,7 @@ class Kinetics(torch.utils.data.Dataset):
     bottom crop if the height is larger than the width.
     """
 
-    def __init__(self, cfg, mode, num_retries=100):
+    def __init__(self, cfg, mode, num_retries=300):
         """
         Construct the Kinetics video loader with a given csv file. The format of
         the csv file is:
@@ -350,6 +350,7 @@ class Kinetics(torch.utils.data.Dataset):
                     0.0, self.cfg.DATA.TRAIN_JITTER_FPS
                     )
 
+            #print(f"Tic {self._path_to_videos[index]}")
             # Decode video. Meta info is used to perform selective decoding.
             frames, time_idx, tdiff = decoder.decode(
                 video_container,
@@ -373,6 +374,7 @@ class Kinetics(torch.utils.data.Dataset):
                 min_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MIN,
                 max_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MAX,
                 )
+            #print(f"Toc {self._path_to_videos[index]}")
             frames_decoded = frames
             time_idx_decoded = time_idx
 
@@ -506,8 +508,9 @@ class Kinetics(torch.utils.data.Dataset):
             return frames, label, index, time_idx, {}
         else:
             logger.warning(
-                "Failed to fetch video after {} retries.".format(
-                    self._num_retries
+                "Failed to fetch video after {} retries: {}".format(
+                    self._num_retries,
+                    self._path_to_videos[index]
                     )
                 )
 

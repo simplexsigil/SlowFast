@@ -506,7 +506,8 @@ class Amarv(torch.utils.data.Dataset):
                 temporally_rnd_clips=True,
                 min_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MIN,
                 max_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MAX,
-                decode_boundaries=self._clip_boundaries[index]
+                decode_boundaries=self._clip_boundaries[index],
+                expected_duration=self._video_duration[index]
             )
             frames_decoded = frames
             time_idx_decoded = time_idx

@@ -153,6 +153,8 @@ _C.TRAIN.AUTO_RESUME = True
 # Path to the checkpoint to load the initial weight.
 _C.TRAIN.CHECKPOINT_FILE_PATH = ""
 
+_C.TRAIN.UNFREEZE_PAT = ""
+
 # Checkpoint types include `caffe2` or `pytorch`.
 _C.TRAIN.CHECKPOINT_TYPE = "pytorch"
 
