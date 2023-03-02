@@ -4,11 +4,13 @@
 import logging as log
 import math
 import os
+
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import make_grid
-
+from sklearn.metrics import balanced_accuracy_score
 import slowfast.utils.logging as logging
 import slowfast.visualization.utils as vis_utils
 from slowfast.utils.misc import get_class_names
@@ -139,8 +141,8 @@ class TensorboardWriter(object):
                     # Get list of tags (parent categories names) and their children.
                     for parent_class, children_ls in self.parent_map.items():
                         tag = (
-                            "Confusion Matrices Grouped by Parent Classes/"
-                            + parent_class
+                                "Confusion Matrices Grouped by Parent Classes/"
+                                + parent_class
                         )
                         add_confusion_matrix(
                             self.writer,
@@ -168,6 +170,44 @@ class TensorboardWriter(object):
                     figsize=self.hist_figsize,
                 )
 
+            if self.cfg.TENSORBOARD.CWRECA.ENABLE:
+                # Normalizes over row: Diag is recall
+                cmtx_norm_row = vis_utils.get_confusion_matrix(preds, labels, self.cfg.MODEL.NUM_CLASSES,
+                                                               normalize="true")
+
+                cwr = np.diag(cmtx_norm_row)
+
+                cwp_plot = plot_bars(tag="Class-wise recall",
+                                     vals=cwr,
+                                     num_classes=self.cfg.MODEL.NUM_CLASSES,
+                                     class_names=self.class_names,
+                                     figsize=self.hist_figsize)
+
+                self.writer.add_figure(
+                    tag="Class-wise recall",
+                    figure=cwp_plot,
+                    global_step=global_step,
+                )
+
+            if self.cfg.TENSORBOARD.CWPREC.ENABLE:
+                # Normalizes over column: Diag is Precision
+                cmtx_norm_col = vis_utils.get_confusion_matrix(preds, labels, self.cfg.MODEL.NUM_CLASSES,
+                                                               normalize="pred")
+
+                cwp = np.diag(cmtx_norm_col)
+
+                cwp_plot = plot_bars(tag="Class-wise precision",
+                                     vals=cwp,
+                                     num_classes=self.cfg.MODEL.NUM_CLASSES,
+                                     class_names=self.class_names,
+                                     figsize=self.hist_figsize)
+
+                self.writer.add_figure(
+                    tag="Class-wise precision",
+                    figure=cwp_plot,
+                    global_step=global_step,
+                )
+
     def add_video(self, vid_tensor, tag="Video Input", global_step=None, fps=4):
         """
         Add input to tensorboard SummaryWriter as a video.
@@ -181,14 +221,14 @@ class TensorboardWriter(object):
         self.writer.add_video(tag, vid_tensor, global_step=global_step, fps=fps)
 
     def plot_weights_and_activations(
-        self,
-        weight_activation_dict,
-        tag="",
-        normalize=False,
-        global_step=None,
-        batch_idx=None,
-        indexing_dict=None,
-        heat_map=True,
+            self,
+            weight_activation_dict,
+            tag="",
+            normalize=False,
+            global_step=None,
+            batch_idx=None,
+            indexing_dict=None,
+            heat_map=True,
     ):
         """
         Visualize weights/ activations tensors to Tensorboard.
@@ -233,14 +273,14 @@ class TensorboardWriter(object):
 
 
 def add_confusion_matrix(
-    writer,
-    cmtx,
-    num_classes,
-    global_step=None,
-    subset_ids=None,
-    class_names=None,
-    tag="Confusion Matrix",
-    figsize=None,
+        writer,
+        cmtx,
+        num_classes,
+        global_step=None,
+        subset_ids=None,
+        class_names=None,
+        tag="Confusion Matrix",
+        figsize=None,
 ):
     """
     Calculate and plot confusion matrix to a SummaryWriter.
@@ -278,14 +318,14 @@ def add_confusion_matrix(
 
 
 def plot_hist(
-    writer,
-    cmtx,
-    num_classes,
-    k=10,
-    global_step=None,
-    subset_ids=None,
-    class_names=None,
-    figsize=None,
+        writer,
+        cmtx,
+        num_classes,
+        k=10,
+        global_step=None,
+        subset_ids=None,
+        class_names=None,
+        figsize=None,
 ):
     """
     Given all predictions and all true labels, plot histograms of top-k most
@@ -329,14 +369,65 @@ def plot_hist(
             )
 
 
+def plot_bars(tag, vals, num_classes, class_names=None, figsize=None, x_label="Ground Truth", y_label=""):
+    if class_names is None:
+        class_names = list(range(num_classes))
+
+    fig = plt.Figure(figsize=figsize, facecolor="w", edgecolor="k")
+
+    ax = fig.add_subplot(1, 1, 1)
+
+    if class_names is None:
+        class_names = [str(i) for i in range(len(vals))]
+
+    tick_marks = np.arange(len(class_names))
+    width = 0.75
+    ax.bar(
+        tick_marks,
+        vals,
+        width,
+        color="orange",
+        tick_label=class_names,
+        edgecolor="w",
+        linewidth=1,
+    )
+
+    ax.set_xlabel(x_label)
+    ax.set_xticks(tick_marks)
+    ax.set_xticklabels(class_names, rotation=-45, ha="center")
+    ax.xaxis.set_label_position("bottom")
+    ax.xaxis.tick_bottom()
+
+    y_tick = np.linspace(0, 1, num=10)
+    ax.set_yticks(y_tick)
+    ax.set_ylabel(y_label)
+    y_labels = [format(i, ".1f") for i in y_tick]
+    ax.set_yticklabels(y_labels, ha="center")
+
+    for i, v in enumerate(vals):
+        ax.text(
+            i - 0.1,
+            v + 0.03,
+            format(v, ".2f"),
+            color="orange",
+            fontweight="bold",
+        )
+
+    ax.set_title(tag)
+
+    fig.set_tight_layout(True)
+
+    return fig
+
+
 def add_ndim_array(
-    writer,
-    array,
-    name,
-    nrow=None,
-    normalize=False,
-    global_step=None,
-    heat_map=True,
+        writer,
+        array,
+        name,
+        nrow=None,
+        normalize=False,
+        global_step=None,
+        heat_map=True,
 ):
     """
     Visualize and add tensors of n-dimentionals to a Tensorboard SummaryWriter. Tensors

@@ -31,6 +31,7 @@ from slowfast.models.contrastive import (
     contrastive_forward,
     contrastive_parameter_surgery,
 )
+from sklearn.metrics import balanced_accuracy_score
 from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter
 from slowfast.utils.multigrid import MultigridSchedule
 import slowfast.datasets.utils as utils
@@ -92,7 +93,7 @@ def train_epoch(
     for cur_iter, (inputs, labels, index, time, meta) in enumerate(
             train_loader
     ):
-        if len(labels) == 2:
+        if isinstance(labels, list) and len(labels) == 2:
             labels, label_names = labels
 
         # Transfer the data to the current GPU device.
@@ -300,6 +301,10 @@ def train_epoch(
         train_meter.log_iter_stats(cur_epoch, cur_iter)
         torch.cuda.synchronize()
         train_meter.iter_tic()
+
+        if cfg.DEBUG_ITERS != -1 and cur_iter == cfg.DEBUG_ITERS:
+            break
+
     del inputs
 
     # in case of fragmented memory
@@ -334,6 +339,10 @@ def eval_epoch(
     val_stats = {}
 
     for cur_iter, (inputs, labels, index, time, meta) in enumerate(val_loader):
+
+        if isinstance(labels, list) and len(labels) == 2:
+            labels, label_names = labels
+
         if cfg.NUM_GPUS:
             # Transferthe data to the current GPU device.
             if isinstance(inputs, (list,)):
@@ -435,7 +444,7 @@ def eval_epoch(
                 )
 
                 val_stats.update({"top1": 100 - top1_err, "top5": 100 - top5_err,
-                                  top1_err: 100 - top1_err, top5_err: 100 - top5_err})
+                                  "top1_err": top1_err, "top5_err": top5_err})
 
                 # write to tensorboard format if available.
                 if writer is not None:
@@ -444,15 +453,13 @@ def eval_epoch(
                         global_step=len(val_loader) * cur_epoch + cur_iter,
                     )
 
-                    writer.add_scalars(
-                        {"Val (Ep)/Top1_err": top1_err, "Val (Ep)/Top5_err": top5_err},
-                        global_step=cur_epoch,
-                    )
-
             val_meter.update_predictions(preds, labels)
 
         val_meter.log_iter_stats(cur_epoch, cur_iter)
         val_meter.iter_tic()
+
+        if cfg.DEBUG_ITERS != -1 and cur_iter == cfg.DEBUG_ITERS:
+            break
 
     # Log epoch stats.
     val_meter.log_epoch_stats(cur_epoch)
@@ -464,14 +471,25 @@ def eval_epoch(
             )
         else:
             all_preds = [pred.clone().detach() for pred in val_meter.all_preds]
-            all_labels = [
-                label.clone().detach() for label in val_meter.all_labels
-            ]
+            all_labels = [label.clone().detach() for label in val_meter.all_labels]
+
             if cfg.NUM_GPUS:
                 all_preds = [pred.cpu() for pred in all_preds]
                 all_labels = [label.cpu() for label in all_labels]
+
             writer.plot_eval(
                 preds=all_preds, labels=all_labels, global_step=cur_epoch
+            )
+
+            if isinstance(all_preds, list):
+                preds = torch.cat(all_preds, dim=0).argmax(dim=1)
+            if isinstance(all_labels, list):
+                labels = torch.cat(all_labels, dim=0)
+
+            writer.add_scalars(
+                {"Val (Ep)/Top1_err": top1_err, "Val (Ep)/Top5_err": top5_err, "Acc": 100 - top1_err,
+                 "Acc-Top5": 100 - top5_err, "Bal-Acc": 100 * balanced_accuracy_score(labels, preds)},
+                global_step=cur_epoch,
             )
 
     val_meter.reset()
