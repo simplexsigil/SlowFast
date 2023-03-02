@@ -8,4 +8,5 @@ def add_custom_config(_C):
     # Add your own customized configs.
     _C.DATA.PATH_CACHE = False
     _C.DATA.ONLOAD_RESIZE = True  # Whether to automatically resize with ffmpeg when using torchvision.
-    pass
+    _C.DATA.AMARV_PERS = "random"
+    _C.TRAIN.TBOARD_VIDEO_EPOCH = 0

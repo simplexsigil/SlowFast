@@ -148,6 +148,7 @@ class Amarv(torch.utils.data.Dataset):
 
         self._labels_proc = []
         self._labels_cats = []
+        self._labels_cats_names = []
         self._labels_cats_150 = []
         self._spatial_temporal_idx = []
         self._clip_boundaries = []
@@ -234,25 +235,27 @@ class Amarv(torch.utils.data.Dataset):
                         # raise RuntimeError("Failed to parse {} info {}.".format(path_to_file, fetch_info))
                         raise e
 
-                def add_row(sequence_dir, clip_index, act, act_cat, act_cat_150, t_start, t_stop, dur):
+                def add_row(sequence_dir, clip_index, act, act_cat, act_cat_150, ac_name, t_start, t_stop, dur):
                     # self._path_to_sequence.append(os.path.join(self.cfg.DATA.PATH_PREFIX, sequence_dir))
                     self._path_to_sequence.append(sequence_dir)
 
                     self._labels_proc.append(int(act))
                     self._labels_cats.append(act_cat)
                     self._labels_cats_150.append(act_cat_150)
+                    self._labels_cats_names.append(ac_name)
                     self._spatial_temporal_idx.append(clip_index)
                     self._clip_boundaries.append((float(t_start), float(t_stop)))
                     self._video_duration.append(float(dur))
                     self._video_meta.append({})
 
                 for sequence_dir in self._sequence_path_map[path]:
-                    acs, acs_150 = list(int(c) for c in act_cats.split(";")), \
-                                   list(int(c) for c in act_cats_150.split(";"))
+                    acs, acs_150, act_cat_names = list(int(c) for c in act_cats.split(";")), \
+                                                  list(int(c) for c in act_cats_150.split(";")), \
+                                                  list(c for c in act_cats_labels.split(";")),
 
-                    for ac, ac_150 in zip(acs, acs_150):
+                    for ac, ac_150, acl in zip(acs, acs_150, act_cat_names):
                         for idx in range(self._num_clips):
-                            add_row(sequence_dir, idx, act, ac, ac_150, t_start, t_stop, dur)
+                            add_row(sequence_dir, idx, act, ac, ac_150, acl, t_start, t_stop, dur)
 
         assert (
                 len(self._path_to_sequence) > 0
@@ -382,8 +385,9 @@ class Amarv(torch.utils.data.Dataset):
         # Try to decode and sample a clip from a video. If the video can not be
         # decoded, repeatly find a random video replacement that can be decoded.
         for i_try in range(self._num_retries):
-            perspective_path: str = random.choice(
-                [f"Videos/RGB_{pers}_Camera_256.mp4" for pers in ["Front", "Left", "Back", "Right"]])
+            if self.cfg.DATA.AMARV_PERS == "random":
+                perspective_path: str = random.choice(  # TODO: make accessible via switch
+                    [f"Videos/RGB_{pers}_Camera_256.mp4" for pers in ["Front", "Left", "Back", "Right"]])
             video_path = os.path.join(self._path_to_sequence[index], perspective_path)
 
             video_container = None
@@ -514,6 +518,7 @@ class Amarv(torch.utils.data.Dataset):
             f_out, time_idx_out = [None] * num_out, [None] * num_out
             idx = -1
             label = self._labels_cats[index]
+            label_name = self._labels_cats_names[index]
 
             for i in range(num_decode):
                 for _ in range(num_aug):
@@ -611,12 +616,13 @@ class Amarv(torch.utils.data.Dataset):
                     and not self.cfg.MODEL.MODEL_NAME == "ContrastiveModel"
             ):
                 label = [label] * num_aug * num_decode
+                label_name = [label_name] * num_aug * num_decode
                 index = [index] * num_aug * num_decode
             if self.cfg.DATA.DUMMY_LOAD:
                 if self.dummy_output is None:
-                    self.dummy_output = (frames, label, index, time_idx, {})
+                    self.dummy_output = (frames, (label, label_name), index, time_idx, {})
 
-            return frames, label, index, time_idx, {}
+            return frames, (label, label_name), index, time_idx, {}
         else:
             logger.warning(
                 "Failed to fetch video after {} retries.".format(

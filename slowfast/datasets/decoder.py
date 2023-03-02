@@ -58,8 +58,8 @@ def get_start_end_idx(
     """
     decode_boundaries = [0, video_size] if decode_boundaries is None else decode_boundaries
 
-    # It is ok to decode with 50% overlap outside of segment, but make sure, to stay in video file.
-    min_start, max_start = decode_boundaries[0] - clip_size // 2, decode_boundaries[1] - clip_size // 2
+    # It is ok to decode with 25% overlap outside of segment, but make sure, to stay in video file.
+    min_start, max_start = decode_boundaries[0] - clip_size // 4, decode_boundaries[1] - 3 * (clip_size // 4)
     min_start, max_start = np.maximum(min_start, 0), np.minimum(max_start, video_size - clip_size)
 
     delta = max_start - min_start
@@ -70,7 +70,7 @@ def get_start_end_idx(
         if use_offset:
             if num_clips_uniform == 1:
                 # Take the center clip if num_clips_uniform is 1.
-                start_idx = math.floor(min_start + delta / 2)
+                start_idx = np.maximum(math.floor(min_start + delta / 2 - clip_size/2), 0)
             else:
                 # Uniformly sample the clip with the given index.
                 start_idx = min_start + clip_idx * math.floor(
@@ -134,8 +134,8 @@ def get_multiple_start_end_idx(
         decode_boundaries = [0, video_size] if decode_boundaries is None else decode_boundaries
         video_size_all = video_size if video_size_all is None else video_size_all
 
-        # It is ok to decode with 50% overlap outside of segment, but make sure, to stay in video file.
-        min_starts, max_starts = decode_boundaries[0] - clip_sizes // 2, decode_boundaries[1] - clip_sizes // 2
+        # It is ok to decode with 25% overlap outside of segment, but make sure, to stay in video file.
+        min_starts, max_starts = decode_boundaries[0] - clip_sizes // 4, decode_boundaries[1] - 3* (clip_sizes // 4)
         min_starts, max_starts = np.maximum(min_starts, np.array([0] * len(clip_sizes))), np.minimum(max_starts,
                                                                                                      video_size_all - clip_sizes)
 
