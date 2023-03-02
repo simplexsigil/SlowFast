@@ -7,6 +7,7 @@
 def add_custom_config(_C):
     # Add your own customized configs.
     _C.DATA.PATH_CACHE = False
+    _C.DATA.SPEED_CORRECTION = False  # For the videos which have wrong speed
     _C.DATA.ONLOAD_RESIZE = True  # Whether to automatically resize with ffmpeg when using torchvision.
     _C.DATA.MODALITY = "RGB"  # input modality, RGB or Depth
     _C.DATA.MAX_DEPTH = 0.659631  # Max disparity value in the dataset

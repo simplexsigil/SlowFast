@@ -47,6 +47,13 @@ def shash(s, k=-1):
     return base64.urlsafe_b64encode(hsh).decode('utf-8')
 
 
+def correct_speed(t_cur, factor, return_int=False):
+    res = t_cur * factor
+    if not return_int:
+        return res
+    return round(res)
+
+
 def histogram_time_durations(time_durations, bin_size=0.2, max_time=5.0):
     time_durations = [td[1] - td[0] for td in time_durations]
     bins = np.arange(0, max_time + bin_size, bin_size)
@@ -147,6 +154,25 @@ class Amarv(torch.utils.data.Dataset):
             path_to_file
         )
 
+        self._speed_corrections = None
+        if self.cfg.DATA.SPEED_CORRECTION:
+            path_to_speed_correction = os.path.join(
+                path_to_label_dir, "video_speed_correction_factors.csv")
+            assert pathmgr.exists(path_to_speed_correction), f"{path_to_speed_correction} not found."
+
+            speed_corrections = {}
+            with pathmgr.open(path_to_speed_correction, "r") as f:
+                rows = f.read().splitlines()
+                for row in rows:
+                    _, video_name, factor = row.split(",")
+                    # if speed correction factor < 1,
+                    # it means the current video is slower than it should be
+                    # So we need to enlarge the corresponding clip boundaries and sampling rate,
+                    # to make sure that the true clip will be covered.
+                    factor = 1 / round(float(factor), 2)
+                    speed_corrections[video_name] = factor
+            self._speed_corrections = speed_corrections
+
         self._path_to_sequence: List[str] = []
 
         self._labels_proc = []
@@ -156,6 +182,7 @@ class Amarv(torch.utils.data.Dataset):
         self._clip_boundaries = []
         self._video_duration = []
         self._video_meta = []
+        self._sampling_rate = []
         self.cur_iter = 0
         self.chunk_epoch = 0
         self.epoch = 0.0
@@ -237,7 +264,24 @@ class Amarv(torch.utils.data.Dataset):
                         # raise RuntimeError("Failed to parse {} info {}.".format(path_to_file, fetch_info))
                         raise e
 
-                def add_row(sequence_dir, clip_index, act, act_cat, act_cat_150, t_start, t_stop, dur):
+                # for local debugging
+                if path not in self._sequence_path_map:
+                    # logger.debug(f'No {path} found.')
+                    continue
+
+                # Speed corrections.
+                # Currently only for depth videos, since rgb videos are now generated correctly.
+                if self._speed_corrections is None:
+                    correction_factor = 1.0
+                else:
+                    correction_factor = self._speed_corrections[path]
+                sampling_rate = correct_speed(
+                    self.cfg.DATA.SAMPLING_RATE, correction_factor, return_int=True)
+                t_start = correct_speed(float(t_start), correction_factor)
+                t_stop = correct_speed(float(t_stop), correction_factor)
+                dur = correct_speed(float(dur), correction_factor)
+
+                def add_row(sequence_dir, clip_index, act, act_cat, act_cat_150, t_start, t_stop, dur, sampling_rate):
                     # self._path_to_sequence.append(os.path.join(self.cfg.DATA.PATH_PREFIX, sequence_dir))
                     self._path_to_sequence.append(sequence_dir)
 
@@ -248,11 +292,7 @@ class Amarv(torch.utils.data.Dataset):
                     self._clip_boundaries.append((float(t_start), float(t_stop)))
                     self._video_duration.append(float(dur))
                     self._video_meta.append({})
-
-                # for local debugging
-                if path not in self._sequence_path_map:
-                    # logger.debug(f'No {path} found.')
-                    continue
+                    self._sampling_rate.append(sampling_rate)
 
                 for sequence_dir in self._sequence_path_map[path]:
                     acs, acs_150 = list(int(c) for c in act_cats.split(";")), \
@@ -260,7 +300,7 @@ class Amarv(torch.utils.data.Dataset):
 
                     for ac, ac_150 in zip(acs, acs_150):
                         for idx in range(self._num_clips):
-                            add_row(sequence_dir, idx, act, ac, ac_150, t_start, t_stop, dur)
+                            add_row(sequence_dir, idx, act, ac, ac_150, t_start, t_stop, dur, sampling_rate)
 
         assert (
                 len(self._path_to_sequence) > 0
@@ -446,7 +486,7 @@ class Amarv(torch.utils.data.Dataset):
             num_frames = [self.cfg.DATA.NUM_FRAMES]
             sampling_rate = np.array(utils.get_random_sampling_rate(
                 self.cfg.MULTIGRID.LONG_CYCLE_SAMPLING_RATE,
-                self.cfg.DATA.SAMPLING_RATE,
+                self._sampling_rate[index],
             ))
             sampling_rate = [sampling_rate]
             if len(num_frames) < num_decode:

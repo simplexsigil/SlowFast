@@ -406,11 +406,14 @@ def torchvision_decode(
         frames_out = [None]
         logger.info("TV decode FAILED: Decoded empty video")
 
-    all_duration = video_meta["video_duration"] if "video_duration" in video_meta else len(v_frames[0])
+    all_duration = video_meta["video_duration"]  # if "video_duration" in video_meta else len(v_frames[0])
 
     if abs(expected_duration - all_duration) > 0.2:
+        print(f'The actual length: {all_duration}')
+        print(f'Expected duration: {expected_duration}')
         logger.warning(f"The actual length of the video file is off by {all_duration - expected_duration} seconds."
                        f"This might be a problem with label assignments and indicates wrong encoding/settings.")
+        raise ValueError
 
     return frames_out, fps, decode_all_video, start_end_delta_time
 
