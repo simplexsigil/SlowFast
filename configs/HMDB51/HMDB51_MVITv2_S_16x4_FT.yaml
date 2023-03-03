@@ -105,3 +105,16 @@ NUM_GPUS: 4
 NUM_SHARDS: 1
 RNG_SEED: 0
 OUTPUT_DIR: experiments/ft_hmdb_mvitv2-s_amarv-scratch
+
+TENSORBOARD:
+  ENABLE: True
+  HISTOGRAM:
+    ENABLE: False
+    FIGSIZE: [64, 8]
+  CONFUSION_MATRIX:
+    ENABLE: True
+    FIGSIZE: [32,32]
+  CWRECA:
+    ENABLE: True
+  CWPREC:
+    ENABLE: True
