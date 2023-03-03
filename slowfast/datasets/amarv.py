@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 import random
-import warnings
 from typing import List
 
 import numpy as np
@@ -14,9 +13,6 @@ import pandas
 import torch
 import torch.utils.data
 import tqdm
-
-warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._functional_video.*")
-warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._transforms_video.*")
 
 from torchvision import transforms
 
@@ -32,7 +28,7 @@ from .transform import (
     MaskingGenerator,
     MaskingGenerator3D,
     create_random_augment,
-)
+    )
 
 logger = logging.get_logger(__name__)
 
@@ -92,7 +88,7 @@ class Amarv(torch.utils.data.Dataset):
             "train",
             "val",
             "test",
-        ], "Split '{}' not supported for Kinetics".format(mode)
+            ], "Split '{}' not supported for Kinetics".format(mode)
         self.mode = mode
         self.cfg = cfg
         self.p_convert_gray = self.cfg.DATA.COLOR_RND_GRAYSCALE
@@ -142,7 +138,7 @@ class Amarv(torch.utils.data.Dataset):
 
         assert pathmgr.exists(path_to_file), "{} dir not found".format(
             path_to_file
-        )
+            )
 
         self._path_to_sequence: List[str] = []
 
@@ -224,7 +220,7 @@ class Amarv(torch.utils.data.Dataset):
             for clip_idx, path_label in tqdm.tqdm(enumerate(rows)):
                 fetch_info = path_label.split(
                     self.cfg.DATA.PATH_LABEL_SEPARATOR
-                )
+                    )
 
                 if len(fetch_info) == 1:
                     path, act = fetch_info[0], 0
@@ -250,8 +246,8 @@ class Amarv(torch.utils.data.Dataset):
 
                 for sequence_dir in self._sequence_path_map[path]:
                     acs, acs_150, act_cat_names = list(int(c) for c in act_cats.split(";")), \
-                                                  list(int(c) for c in act_cats_150.split(";")), \
-                                                  list(c for c in act_cats_labels.split(";")),
+                        list(int(c) for c in act_cats_150.split(";")), \
+                        list(c for c in act_cats_labels.split(";")),
 
                     for ac, ac_150, acl in zip(acs, acs_150, act_cat_names):
                         for idx in range(self._num_clips):
@@ -261,12 +257,12 @@ class Amarv(torch.utils.data.Dataset):
                 len(self._path_to_sequence) > 0
         ), "Failed to load Amarv split {} from {}".format(
             self._split_idx, path_to_file
-        )
+            )
         logger.info(
             "Constructing Amarv dataloader (size: {} skip_rows {}) from {} ".format(
                 len(self._path_to_sequence), self.skip_rows, path_to_file
+                )
             )
-        )
 
     def _set_epoch_num(self, epoch):
         self.epoch = epoch
@@ -277,7 +273,7 @@ class Amarv(torch.utils.data.Dataset):
                     path_to_file,
                     chunksize=self.cfg.DATA.LOADER_CHUNK_SIZE,
                     skiprows=self.skip_rows,
-            ):
+                    ):
                 break
         except Exception:
             self.skip_rows = 0
@@ -320,8 +316,8 @@ class Amarv(torch.utils.data.Dataset):
                     round(
                         self.cfg.MULTIGRID.SHORT_CYCLE_FACTORS[short_cycle_idx]
                         * self.cfg.MULTIGRID.DEFAULT_S
+                        )
                     )
-                )
             if self.cfg.MULTIGRID.DEFAULT_S > 0:
                 # Decreasing the scale is equivalent to using a larger "span"
                 # in a sampling grid.
@@ -330,8 +326,8 @@ class Amarv(torch.utils.data.Dataset):
                         float(min_scale)
                         * crop_size
                         / self.cfg.MULTIGRID.DEFAULT_S
+                        )
                     )
-                )
         elif self.mode in ["test"]:
             temporal_sample_index = (
                     self._spatial_temporal_idx[index]
@@ -360,7 +356,7 @@ class Amarv(torch.utils.data.Dataset):
         else:
             raise NotImplementedError(
                 "Does not support {} mode".format(self.mode)
-            )
+                )
         num_decode = (
             self.cfg.DATA.TRAIN_CROP_NUM_TEMPORAL
             if self.mode in ["train"]
@@ -396,13 +392,13 @@ class Amarv(torch.utils.data.Dataset):
                     video_path,
                     self.cfg.DATA_LOADER.ENABLE_MULTI_THREAD_DECODE,
                     self.cfg.DATA.DECODING_BACKEND,
-                )
+                    )
             except Exception as e:
                 logger.info(
                     "Failed to load video from {} with error {}".format(
                         video_path, e
+                        )
                     )
-                )
                 if self.mode not in ["test"]:
                     # let's try another one
                     index = random.randint(0, len(self._path_to_sequence) - 1)
@@ -411,8 +407,8 @@ class Amarv(torch.utils.data.Dataset):
                 logger.warning(
                     "Failed to meta load video idx {} from {}; trial {}".format(
                         index, video_path, i_try
+                        )
                     )
-                )
                 if self.mode not in ["test"] and i_try > self._num_retries // 8:
                     # let's try another one
                     index = random.randint(0, len(self._path_to_sequence) - 1)
@@ -421,29 +417,29 @@ class Amarv(torch.utils.data.Dataset):
             frames_decoded, time_idx_decoded = (
                 [None] * num_decode,
                 [None] * num_decode,
-            )
+                )
 
             # for i in range(num_decode):
             num_frames = [self.cfg.DATA.NUM_FRAMES]
             sampling_rate = np.array(utils.get_random_sampling_rate(
                 self.cfg.MULTIGRID.LONG_CYCLE_SAMPLING_RATE,
                 self.cfg.DATA.SAMPLING_RATE,
-            ))
+                ))
             sampling_rate = [sampling_rate]
             if len(num_frames) < num_decode:
                 num_frames.extend(
                     [
                         num_frames[-1]
                         for i in range(num_decode - len(num_frames))
-                    ]
-                )
+                        ]
+                    )
                 # base case where keys have same frame-rate as query
                 sampling_rate.extend(
                     [
                         sampling_rate[-1]
                         for i in range(num_decode - len(sampling_rate))
-                    ]
-                )
+                        ]
+                    )
             elif len(num_frames) > num_decode:
                 num_frames = num_frames[:num_decode]
                 sampling_rate = sampling_rate[:num_decode]
@@ -460,7 +456,7 @@ class Amarv(torch.utils.data.Dataset):
             if self.cfg.DATA.TRAIN_JITTER_FPS > 0.0 and self.mode in ["train"]:
                 target_fps += random.uniform(
                     0.0, self.cfg.DATA.TRAIN_JITTER_FPS
-                )
+                    )
 
             sampling_rate = np.array(sampling_rate)
             num_frames = np.array(num_frames)
@@ -489,7 +485,7 @@ class Amarv(torch.utils.data.Dataset):
                 max_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MAX,
                 decode_boundaries=self._clip_boundaries[index],
                 expected_duration=self._video_duration[index]
-            )
+                )
             frames_decoded = frames
             time_idx_decoded = time_idx
 
@@ -499,8 +495,8 @@ class Amarv(torch.utils.data.Dataset):
                 logger.warning(
                     "Failed to decode video idx {} from {}; trial {}".format(
                         index, video_path, i_try
+                        )
                     )
-                )
                 if (
                         (self.mode not in ["test"] or self.cfg.TEST.ACCEPT_MISSING)
                         and (i_try % (self._num_retries // 8)) == 0
@@ -541,14 +537,14 @@ class Amarv(torch.utils.data.Dataset):
                             moco_v2_aug=self.cfg.DATA.SSL_MOCOV2_AUG,
                             gaussan_sigma_min=self.cfg.DATA.SSL_BLUR_SIGMA_MIN,
                             gaussan_sigma_max=self.cfg.DATA.SSL_BLUR_SIGMA_MAX,
-                        )
+                            )
 
                     if self.aug and self.cfg.AUG.AA_TYPE:
                         aug_transform = create_random_augment(
                             input_size=(f_out[idx].size(1), f_out[idx].size(2)),
                             auto_augment=self.cfg.AUG.AA_TYPE,
                             interpolation=self.cfg.AUG.INTERPOLATION,
-                        )
+                            )
                         # T H W C -> T C H W.
                         f_out[idx] = f_out[idx].permute(0, 3, 1, 2)
                         list_img = self._frame_to_list_img(f_out[idx])
@@ -559,7 +555,7 @@ class Amarv(torch.utils.data.Dataset):
                     # Perform color normalization.
                     f_out[idx] = utils.tensor_normalize(
                         f_out[idx], self.cfg.DATA.MEAN, self.cfg.DATA.STD
-                    )
+                        )
 
                     # T H W C -> C T H W.
                     f_out[idx] = f_out[idx].permute(3, 0, 1, 2)
@@ -567,7 +563,7 @@ class Amarv(torch.utils.data.Dataset):
                     scl, asp = (
                         self.cfg.DATA.TRAIN_JITTER_SCALES_RELATIVE,
                         self.cfg.DATA.TRAIN_JITTER_ASPECT_RELATIVE,
-                    )
+                        )
                     relative_scales = (
                         None
                         if (self.mode not in ["train"] or len(scl) == 0)
@@ -591,7 +587,7 @@ class Amarv(torch.utils.data.Dataset):
                         motion_shift=self.cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
                         if self.mode in ["train"]
                         else False,
-                    )
+                        )
 
                     if self.rand_erase:
                         erase_transform = RandomErasing(
@@ -600,10 +596,10 @@ class Amarv(torch.utils.data.Dataset):
                             max_count=self.cfg.AUG.RE_COUNT,
                             num_splits=self.cfg.AUG.RE_COUNT,
                             device="cpu",
-                        )
+                            )
                         f_out[idx] = erase_transform(
                             f_out[idx].permute(1, 0, 2, 3)
-                        ).permute(1, 0, 2, 3)
+                            ).permute(1, 0, 2, 3)
 
                     f_out[idx] = utils.pack_pathway_output(self.cfg, f_out[idx])
                     if self.cfg.AUG.GEN_MASK_LOADER:
@@ -627,36 +623,36 @@ class Amarv(torch.utils.data.Dataset):
             logger.warning(
                 "Failed to fetch video after {} retries.".format(
                     self._num_retries
+                    )
                 )
-            )
 
     def _gen_mask(self):
         if self.cfg.AUG.MASK_TUBE:
             num_masking_patches = round(
                 np.prod(self.cfg.AUG.MASK_WINDOW_SIZE) * self.cfg.AUG.MASK_RATIO
-            )
+                )
             min_mask = num_masking_patches // 5
             masked_position_generator = MaskingGenerator(
                 mask_window_size=self.cfg.AUG.MASK_WINDOW_SIZE,
                 num_masking_patches=num_masking_patches,
                 max_num_patches=None,
                 min_num_patches=min_mask,
-            )
+                )
             mask = masked_position_generator()
             mask = np.tile(mask, (8, 1, 1))
         elif self.cfg.AUG.MASK_FRAMES:
             mask = np.zeros(shape=self.cfg.AUG.MASK_WINDOW_SIZE, dtype=np.int)
             n_mask = round(
                 self.cfg.AUG.MASK_WINDOW_SIZE[0] * self.cfg.AUG.MASK_RATIO
-            )
+                )
             mask_t_ind = random.sample(
                 range(0, self.cfg.AUG.MASK_WINDOW_SIZE[0]), n_mask
-            )
+                )
             mask[mask_t_ind, :, :] += 1
         else:
             num_masking_patches = round(
                 np.prod(self.cfg.AUG.MASK_WINDOW_SIZE) * self.cfg.AUG.MASK_RATIO
-            )
+                )
             max_mask = np.prod(self.cfg.AUG.MASK_WINDOW_SIZE[1:])
             min_mask = max_mask // 5
             masked_position_generator = MaskingGenerator3D(
@@ -664,14 +660,14 @@ class Amarv(torch.utils.data.Dataset):
                 num_masking_patches=num_masking_patches,
                 max_num_patches=max_mask,
                 min_num_patches=min_mask,
-            )
+                )
             mask = masked_position_generator()
         return mask
 
     def _frame_to_list_img(self, frames):
         img_list = [
             transforms.ToPILImage()(frames[i]) for i in range(frames.size(0))
-        ]
+            ]
         return img_list
 
     def _list_img_to_frames(self, img_list):

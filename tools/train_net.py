@@ -3,16 +3,19 @@
 
 """Train a video classification model."""
 
+import warnings
+
+warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._functional_video.*")
+warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._transforms_video.*")
+warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\.functional_tensor.*")
+
 import math
 import pprint
-import warnings
 
 import numpy as np
 # import tensorboard.summary
 # from tensorboard.
 import torch
-
-warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._functional_video.*")
 
 from fvcore.nn.precise_bn import get_bn_modules, update_bn_stats
 

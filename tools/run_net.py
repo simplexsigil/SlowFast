@@ -3,7 +3,10 @@
 
 """Wrapper to train and test a video classification model."""
 import warnings
+
 warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._functional_video.*")
+warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._transforms_video.*")
+warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\.functional_tensor.*")
 
 from slowfast.config.defaults import assert_and_infer_cfg
 from slowfast.utils.misc import launch_job
@@ -19,6 +22,8 @@ import os
 
 # print(f"CPU Count: {os.cpu_count()}")
 torch.set_num_threads(os.cpu_count())
+
+
 # print(f"Num threads: {torch.get_num_threads()}")
 
 def main():
@@ -47,8 +52,8 @@ def main():
 
         # Perform model visualization.
         if cfg.TENSORBOARD.ENABLE and (
-            cfg.TENSORBOARD.MODEL_VIS.ENABLE
-            or cfg.TENSORBOARD.WRONG_PRED_VIS.ENABLE
+                cfg.TENSORBOARD.MODEL_VIS.ENABLE
+                or cfg.TENSORBOARD.WRONG_PRED_VIS.ENABLE
         ):
             launch_job(cfg=cfg, init_method=args.init_method, func=visualize)
 
