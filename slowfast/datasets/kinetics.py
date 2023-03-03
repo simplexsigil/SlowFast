@@ -107,12 +107,8 @@ class Kinetics(torch.utils.data.Dataset):
         """
         Construct the video loader.
         """
-        path_to_file = os.path.join(
-            self.cfg.DATA.PATH_TO_DATA_DIR, "{}.csv".format(self.mode)
-            )
-        assert pathmgr.exists(path_to_file), "{} dir not found".format(
-            path_to_file
-            )
+        path_to_file = os.path.join(os.path.expandvars(self.cfg.DATA.PATH_TO_DATA_DIR), "{}.csv".format(self.mode))
+        assert pathmgr.exists(os.path.expandvars(path_to_file)), "{} dir not found".format(path_to_file)
 
         self._path_to_videos = []
         self._labels = []
@@ -145,7 +141,7 @@ class Kinetics(torch.utils.data.Dataset):
                         )
                 for idx in range(self._num_clips):
                     self._path_to_videos.append(
-                        os.path.join(self.cfg.DATA.PATH_PREFIX, path)
+                        os.path.join(os.path.expandvars(self.cfg.DATA.PATH_PREFIX), path)
                         )
                     self._labels.append(int(label))
                     self._spatial_temporal_idx.append(idx)
@@ -350,7 +346,7 @@ class Kinetics(torch.utils.data.Dataset):
                     0.0, self.cfg.DATA.TRAIN_JITTER_FPS
                     )
 
-            #print(f"Tic {self._path_to_videos[index]}")
+            # print(f"Tic {self._path_to_videos[index]}")
             # Decode video. Meta info is used to perform selective decoding.
             frames, time_idx, tdiff = decoder.decode(
                 video_container,
@@ -374,7 +370,7 @@ class Kinetics(torch.utils.data.Dataset):
                 min_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MIN,
                 max_delta=self.cfg.CONTRASTIVE.DELTA_CLIPS_MAX,
                 )
-            #print(f"Toc {self._path_to_videos[index]}")
+            # print(f"Toc {self._path_to_videos[index]}")
             frames_decoded = frames
             time_idx_decoded = time_idx
 
