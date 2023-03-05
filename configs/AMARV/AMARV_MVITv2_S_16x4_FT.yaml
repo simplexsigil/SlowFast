@@ -1,4 +1,4 @@
-TASK: ssl_eval
+TASK: ssl_asdeval
 TRAIN:
   ENABLE: True
   DATASET: AMARV

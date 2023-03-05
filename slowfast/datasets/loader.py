@@ -35,7 +35,7 @@ def multiple_samples_collate(batch, fold=False):
     time = [item for sublist in time for item in sublist]
 
     if isinstance(labels, typing.List) and isinstance(labels[0], typing.List):
-        labels, label_names = labels
+        labels, label_names = [item for sublist in labels[::2] for item in sublist], [item for sublist in labels[1::2] for item in sublist]
         inputs, labels, label_names, video_idx, time, extra_data = (
             default_collate(inputs),
             default_collate(labels),
