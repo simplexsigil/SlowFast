@@ -43,7 +43,7 @@ MVIT:
   CLS_EMBED_ON: True # default: True
   USE_ABS_POS: False # default: True
   SEP_POS_EMBED: True # default: false
-  SEPARATE_QKV: True  # This is necessary to load the official weight file.
+  # SEPARATE_QKV: True  # This is necessary to load the official weight file.
   REL_POS_SPATIAL: True # default: false
   REL_POS_TEMPORAL: True # default: false
   RESIDUAL_POOLING: True
