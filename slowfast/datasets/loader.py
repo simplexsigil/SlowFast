@@ -11,6 +11,7 @@ import torch
 from torch.utils.data._utils.collate import default_collate
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data.sampler import RandomSampler, Sampler
+import typing
 
 from slowfast.datasets.multigrid_helper import ShortCycleBatchSampler
 
@@ -33,13 +34,27 @@ def multiple_samples_collate(batch, fold=False):
     video_idx = [item for sublist in video_idx for item in sublist]
     time = [item for sublist in time for item in sublist]
 
-    inputs, labels, video_idx, time, extra_data = (
-        default_collate(inputs),
-        default_collate(labels),
-        default_collate(video_idx),
-        default_collate(time),
-        default_collate(extra_data),
-    )
+    if isinstance(labels, typing.List) and isinstance(labels[0], typing.List):
+        labels, label_names = labels
+        inputs, labels, label_names, video_idx, time, extra_data = (
+            default_collate(inputs),
+            default_collate(labels),
+            default_collate(label_names),
+            default_collate(video_idx),
+            default_collate(time),
+            default_collate(extra_data),
+        )
+
+        labels = [labels, label_names]
+    else:
+        inputs, labels, video_idx, time, extra_data = (
+            default_collate(inputs),
+            default_collate(labels),
+            default_collate(video_idx),
+            default_collate(time),
+            default_collate(extra_data),
+        )
+
     if fold:
         return [inputs], labels, video_idx, time, extra_data
     else:

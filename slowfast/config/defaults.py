@@ -891,6 +891,9 @@ _C.TASK = ""
 # Number of GPUs to use (applies to both training and testing).
 _C.NUM_GPUS = 1
 
+# This is used when multiple instances are to be started on one server. Allows grabbing second or third GPU.
+_C.GPU_OFFSET = 0
+
 # Number of machine to use for the job.
 _C.NUM_SHARDS = 1
 
