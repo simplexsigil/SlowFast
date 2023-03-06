@@ -54,6 +54,12 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
     for cur_iter, (inputs, labels, video_idx, time, meta) in enumerate(
             test_loader
             ):
+
+        if isinstance(labels, list) and len(labels) == 2:
+            labels, label_names = labels
+        else:
+            label_names = [str(l) for l in labels]
+
         if cfg.NUM_GPUS:
             # Transfer the data to the current GPU device.
             if isinstance(inputs, (list,)):
