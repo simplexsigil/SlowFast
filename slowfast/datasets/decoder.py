@@ -373,7 +373,8 @@ def torchvision_decode(video_handle,
                 )
             if v_frames is None or v_frames.shape == torch.Size([0]):
                 decode_all_video = True
-                logger.info("TV decode FAILED try decode all")
+                # This is not yet an emergency.
+                # logger.info("TV decode FAILED try decode all")
                 break
             frames_out[k] = v_frames
 
