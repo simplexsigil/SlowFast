@@ -799,7 +799,7 @@ class ValMeter(object):
         self.all_preds.append(preds)
         self.all_labels.append(labels)
 
-    def log_iter_stats(self, cur_epoch, cur_iter):
+    def log_iter_stats(self, cur_epoch, cur_iter, writer=None):
         """
         log the stats of the current iteration.
         Args:
@@ -832,7 +832,7 @@ class ValMeter(object):
 
         logging.log_json_stats(stats)
 
-    def log_epoch_stats(self, cur_epoch):
+    def log_epoch_stats(self, cur_epoch, writer=None):
         """
         Log the stats of the current epoch.
         Args:
@@ -872,6 +872,16 @@ class ValMeter(object):
             stats["min_top5_acc"] = 100 - self.min_top5_err
 
         logging.log_json_stats(stats, self.output_dir)
+
+        if writer is not None:
+            writer.add_scalars(
+                {"Val (Ep)/Top1_err": stats["top1_err"],
+                 "Val (Ep)/Top5_err": stats["top5_err"],
+                 "Val (Ep)/Acc-Top1":      100 - stats["top1_err"],
+                 "Val (Ep)/Acc-Top5": 100 - stats["top5_err"],
+                 "Val (Ep)/Bal-Acc":  stats["bal_acc"]},
+                global_step=cur_epoch,
+                )
 
 
 def get_map(preds, labels):

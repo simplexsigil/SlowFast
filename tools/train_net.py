@@ -297,8 +297,10 @@ def train_epoch(
                     {
                         "Train/loss":     loss,
                         "Train/lr":       lr,
-                        "Train/Top1_err": top1_err,
-                        "Train/Top5_err": top5_err,
+                        "Train/Top1_err": train_meter.mb_top1_err.get_win_median(),
+                        "Train/Top5_err": train_meter.mb_top5_err.get_win_median(),
+                        "Train/Top1_acc": 100 - train_meter.mb_top1_err.get_win_median(),
+                        "Train/Top5_acc": 100 - train_meter.mb_top5_err.get_win_median()
                         },
                     global_step=data_size * cur_epoch + cur_iter,
                     )
@@ -450,23 +452,25 @@ def eval_epoch(
                 val_stats.update({"top1":     100 - top1_err, "top5": 100 - top5_err,
                                   "top1_err": top1_err, "top5_err": top5_err})
 
-                # write to tensorboard format if available.
-                if writer is not None:
-                    writer.add_scalars(
-                        {"Val/Top1_err": top1_err, "Val/Top5_err": top5_err},
-                        global_step=len(val_loader) * cur_epoch + cur_iter,
-                        )
+                val_meter.update_predictions(preds, labels)
 
-            val_meter.update_predictions(preds, labels)
+        val_meter.log_iter_stats(cur_epoch, cur_iter, writer)
 
-        val_meter.log_iter_stats(cur_epoch, cur_iter)
         val_meter.iter_tic()
+
+        # write to tensorboard format if available.
+        if writer is not None:
+            writer.add_scalars(
+                {"Val/Top1_err": val_meter.mb_top1_err.get_win_median(),
+                 "Val/Top5_err": val_meter.mb_top5_err.get_win_median()},
+                global_step=len(val_loader) * cur_epoch + cur_iter,
+                )
 
         if cfg.DEBUG_ITERS != -1 and cur_iter == cfg.DEBUG_ITERS:
             break
 
     # Log epoch stats.
-    val_meter.log_epoch_stats(cur_epoch)
+    val_meter.log_epoch_stats(cur_epoch, writer)
     # write to tensorboard format if available.
     if writer is not None:
         if cfg.DETECTION.ENABLE:
@@ -483,17 +487,6 @@ def eval_epoch(
 
             writer.plot_eval(
                 preds=all_preds, labels=all_labels, global_step=cur_epoch
-                )
-
-            if isinstance(all_preds, list):
-                preds = torch.cat(all_preds, dim=0).argmax(dim=1)
-            if isinstance(all_labels, list):
-                labels = torch.cat(all_labels, dim=0)
-
-            writer.add_scalars(
-                {"Val (Ep)/Top1_err": top1_err, "Val (Ep)/Top5_err": top5_err, "Acc": 100 - top1_err,
-                 "Acc-Top5":          100 - top5_err, "Bal-Acc": 100 * balanced_accuracy_score(labels, preds)},
-                global_step=cur_epoch,
                 )
 
     val_meter.reset()
