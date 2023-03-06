@@ -427,6 +427,7 @@ def launch_job(cfg, init_method, func, daemon=False):
             daemon=daemon,
         )
     else:
+        torch.cuda.set_device(cfg.GPU_OFFSET)
         func(cfg=cfg)
 
 
