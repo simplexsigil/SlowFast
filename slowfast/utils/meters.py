@@ -365,17 +365,20 @@ class TestMeter(object):
         eta_sec = self.iter_timer.seconds() * (self.overall_iters - cur_iter)
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
 
-        num_topks_correct = metrics.topks_correct(self.video_preds[self.idx_mask], self.video_labels[self.idx_mask], ks)
+        curr_preds, curr_labs = self.video_preds[self.idx_mask], self.video_labels[self.idx_mask]
 
-        topks = [
-            (x / np.sum(self.idx_mask)) * 100.0
-            for x in num_topks_correct
-        ]
+        num_topks_correct = metrics.topks_correct(curr_preds, curr_labs, ks)
+
+        topks = [(x / np.sum(self.idx_mask)) * 100.0 for x in num_topks_correct]
+
+        curr_preds_idxs = curr_preds.argmax(dim=1)
+        bal_acc = balanced_accuracy_score(curr_labs, curr_preds_idxs) * 100
 
         stats = {
             "split": "test_iter",
             "cur_iter": "{}".format(cur_iter + 1),
             "cur_acc": topks[0].cpu().numpy().item(),
+            "cur_bal_acc": bal_acc,
             "eta": eta,
             "time_diff": self.iter_timer.seconds(),
         }
@@ -425,19 +428,19 @@ class TestMeter(object):
             self.stats["top1_acc"] = map_str
             self.stats["top5_acc"] = map_str
         else:
-            num_topks_correct = metrics.topks_correct(
-                self.video_preds, self.video_labels, ks
-            )
-            topks = [
-                (x / self.video_preds.size(0)) * 100.0
-                for x in num_topks_correct
-            ]
+            num_topks_correct = metrics.topks_correct(self.video_preds, self.video_labels, ks)
+            topks = [(x / self.video_preds.size(0)) * 100.0 for x in num_topks_correct]
+
             assert len({len(ks), len(topks)}) == 1
+
             for k, topk in zip(ks, topks):
                 # self.stats["top{}_acc".format(k)] = topk.cpu().numpy()
-                self.stats["top{}_acc".format(k)] = "{:.{prec}f}".format(
-                    topk, prec=2
-                )
+                self.stats["top{}_acc".format(k)] = "{:.{prec}f}".format(topk, prec=2)
+
+            preds_idxs = self.video_preds.argmax(dim=1)
+            bal_acc = balanced_accuracy_score(self.video_labels, preds_idxs) * 100
+
+            self.stats["bal_acc"] = bal_acc
 
         logging.log_json_stats(self.stats)
 
