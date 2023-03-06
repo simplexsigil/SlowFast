@@ -4,6 +4,7 @@
 """ResNe(X)t Head helper."""
 
 from functools import partial
+
 import torch
 import torch.nn as nn
 from detectron2.layers import ROIAlign
@@ -13,7 +14,6 @@ from slowfast.models.attention import MultiScaleBlock
 from slowfast.models.batchnorm_helper import (
     NaiveSyncBatchNorm1d as NaiveSyncBatchNorm1d,
 )
-from slowfast.models.nonlocal_helper import Nonlocal
 
 logger = logging.get_logger(__name__)
 
@@ -24,16 +24,16 @@ class ResNetRoIHead(nn.Module):
     """
 
     def __init__(
-        self,
-        dim_in,
-        num_classes,
-        pool_size,
-        resolution,
-        scale_factor,
-        dropout_rate=0.0,
-        act_func="softmax",
-        aligned=True,
-        detach_final_fc=False,
+            self,
+            dim_in,
+            num_classes,
+            pool_size,
+            resolution,
+            scale_factor,
+            dropout_rate=0.0,
+            act_func="softmax",
+            aligned=True,
+            detach_final_fc=False,
     ):
         """
         The `__init__` method of any subclass should also contain these
@@ -77,7 +77,7 @@ class ResNetRoIHead(nn.Module):
         """
         super(ResNetRoIHead, self).__init__()
         assert (
-            len({len(pool_size), len(dim_in)}) == 1
+                len({len(pool_size), len(dim_in)}) == 1
         ), "pathway dimensions are not consistent."
         self.num_pathways = len(pool_size)
         self.detach_final_fc = detach_final_fc
@@ -118,7 +118,7 @@ class ResNetRoIHead(nn.Module):
 
     def forward(self, inputs, bboxes):
         assert (
-            len(inputs) == self.num_pathways
+                len(inputs) == self.num_pathways
         ), "Input tensor does not contain {} pathway".format(self.num_pathways)
         pool_out = []
         for pathway in range(self.num_pathways):
@@ -150,17 +150,17 @@ class ResNetRoIHead(nn.Module):
 
 class MLPHead(nn.Module):
     def __init__(
-        self,
-        dim_in,
-        dim_out,
-        mlp_dim,
-        num_layers,
-        bn_on=False,
-        bias=True,
-        flatten=False,
-        xavier_init=True,
-        bn_sync_num=1,
-        global_sync=False,
+            self,
+            dim_in,
+            dim_out,
+            mlp_dim,
+            num_layers,
+            bn_on=False,
+            bias=True,
+            flatten=False,
+            xavier_init=True,
+            bn_sync_num=1,
+            global_sync=False,
     ):
         super(MLPHead, self).__init__()
         self.flatten = flatten
@@ -209,14 +209,14 @@ class ResNetBasicHead(nn.Module):
     """
 
     def __init__(
-        self,
-        dim_in,
-        num_classes,
-        pool_size,
-        dropout_rate=0.0,
-        act_func="softmax",
-        detach_final_fc=False,
-        cfg=None,
+            self,
+            dim_in,
+            num_classes,
+            pool_size,
+            dropout_rate=0.0,
+            act_func="softmax",
+            detach_final_fc=False,
+            cfg=None,
     ):
         """
         The `__init__` method of any subclass should also contain these
@@ -242,7 +242,7 @@ class ResNetBasicHead(nn.Module):
         """
         super(ResNetBasicHead, self).__init__()
         assert (
-            len({len(pool_size), len(dim_in)}) == 1
+                len({len(pool_size), len(dim_in)}) == 1
         ), "pathway dimensions are not consistent."
         self.num_pathways = len(pool_size)
         self.detach_final_fc = detach_final_fc
@@ -275,7 +275,7 @@ class ResNetBasicHead(nn.Module):
                 if cfg.CONTRASTIVE.BN_SYNC_MLP
                 else 1,
                 global_sync=(
-                    cfg.CONTRASTIVE.BN_SYNC_MLP and cfg.BN.GLOBAL_SYNC
+                        cfg.CONTRASTIVE.BN_SYNC_MLP and cfg.BN.GLOBAL_SYNC
                 ),
             )
 
@@ -306,14 +306,14 @@ class ResNetBasicHead(nn.Module):
                     if cfg.CONTRASTIVE.BN_SYNC_MLP
                     else 1,
                     global_sync=(
-                        cfg.CONTRASTIVE.BN_SYNC_MLP and cfg.BN.GLOBAL_SYNC
+                            cfg.CONTRASTIVE.BN_SYNC_MLP and cfg.BN.GLOBAL_SYNC
                     ),
                 )
                 self.predictors.append(local_mlp)
 
     def forward(self, inputs):
         assert (
-            len(inputs) == self.num_pathways
+                len(inputs) == self.num_pathways
         ), "Input tensor does not contain {} pathway".format(self.num_pathways)
         pool_out = []
         for pathway in range(self.num_pathways):
@@ -331,8 +331,8 @@ class ResNetBasicHead(nn.Module):
             x = nn.functional.normalize(x, dim=1, p=2)
 
         if (
-            x.shape[1:4] == torch.Size([1, 1, 1])
-            and self.cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                x.shape[1:4] == torch.Size([1, 1, 1])
+                and self.cfg.MODEL.MODEL_NAME == "ContrastiveModel"
         ):
             x = x.view(x.shape[0], -1)
 
@@ -369,19 +369,20 @@ class X3DHead(nn.Module):
     """
 
     def __init__(
-        self,
-        dim_in,
-        dim_inner,
-        dim_out,
-        num_classes,
-        pool_size,
-        dropout_rate=0.0,
-        act_func="softmax",
-        inplace_relu=True,
-        eps=1e-5,
-        bn_mmt=0.1,
-        norm_module=nn.BatchNorm3d,
-        bn_lin5_on=False,
+            self,
+            dim_in,
+            dim_inner,
+            dim_out,
+            num_classes,
+            pool_size,
+            dropout_rate=0.0,
+            act_func="softmax",
+            inplace_relu=True,
+            eps=1e-5,
+            bn_mmt=0.1,
+            norm_module=nn.BatchNorm3d,
+            bn_lin5_on=False,
+            ret_feats=False
     ):
         """
         The `__init__` method of any subclass should also contain these
@@ -408,6 +409,7 @@ class X3DHead(nn.Module):
                 before the classifier.
         """
         super(X3DHead, self).__init__()
+        self.ret_feats = ret_feats
         self.pool_size = pool_size
         self.dropout_rate = dropout_rate
         self.num_classes = num_classes
@@ -485,6 +487,9 @@ class X3DHead(nn.Module):
 
         # (N, C, T, H, W) -> (N, T, H, W, C).
         x = x.permute((0, 2, 3, 4, 1))
+
+        if self.ret_feats:
+            feat = x
         # Perform dropout.
         if hasattr(self, "dropout"):
             x = self.dropout(x)
@@ -496,7 +501,13 @@ class X3DHead(nn.Module):
             x = x.mean([1, 2, 3])
 
         x = x.view(x.shape[0], -1)
-        return x
+
+        if self.ret_feats:
+            feat = feat.mean([1, 2, 3])
+            feat = feat.reshape(x.shape[0], -1)
+            return x, feat
+        else:
+            return x
 
 
 class TransformerBasicHead(nn.Module):
@@ -505,12 +516,12 @@ class TransformerBasicHead(nn.Module):
     """
 
     def __init__(
-        self,
-        dim_in,
-        num_classes,
-        dropout_rate=0.0,
-        act_func="softmax",
-        cfg=None,
+            self,
+            dim_in,
+            num_classes,
+            dropout_rate=0.0,
+            act_func="softmax",
+            cfg=None,
     ):
         """
         Perform linear projection and activation as head for tranformers.
@@ -523,6 +534,8 @@ class TransformerBasicHead(nn.Module):
                 softmax on the output. 'sigmoid': applies sigmoid on the output.
         """
         super(TransformerBasicHead, self).__init__()
+        self.ret_feat = cfg.MODEL.RET_FEATS
+
         if dropout_rate > 0.0:
             self.dropout = nn.Dropout(dropout_rate)
         self.projection = nn.Linear(dim_in, num_classes, bias=True)
@@ -540,7 +553,7 @@ class TransformerBasicHead(nn.Module):
                 if cfg.CONTRASTIVE.BN_SYNC_MLP
                 else 1,
                 global_sync=(
-                    cfg.CONTRASTIVE.BN_SYNC_MLP and cfg.BN.GLOBAL_SYNC
+                        cfg.CONTRASTIVE.BN_SYNC_MLP and cfg.BN.GLOBAL_SYNC
                 ),
             )
         self.detach_final_fc = cfg.MODEL.DETACH_FINAL_FC
@@ -563,6 +576,8 @@ class TransformerBasicHead(nn.Module):
             x = self.dropout(x)
         if self.detach_final_fc:
             x = x.detach()
+        if self.ret_feat:
+            feat = x
         x = self.projection(x)
 
         if not self.training:
@@ -574,7 +589,10 @@ class TransformerBasicHead(nn.Module):
 
         x = x.view(x.shape[0], -1)
 
-        return x
+        if self.ret_feat:
+            return x, feat
+        else:
+            return x
 
 
 class MSSeparateHead(nn.Module):
@@ -588,11 +606,11 @@ class MSSeparateHead(nn.Module):
     """
 
     def __init__(
-        self,
-        blocks,
-        cfg,
-        num_classes,
-        feat_sz,
+            self,
+            blocks,
+            cfg,
+            num_classes,
+            feat_sz,
     ):
         super(MSSeparateHead, self).__init__()
         head_type = cfg.MASK.HEAD_TYPE.split("_")
@@ -620,7 +638,7 @@ class MSSeparateHead(nn.Module):
         self.transforms = nn.ModuleList()
         self.projections = nn.ModuleList()
         for depth, num_class, feature_size in zip(
-            depth_list, num_classes, feat_sz
+                depth_list, num_classes, feat_sz
         ):
             head_dim = (
                 cfg.MASK.DECODER_EMBED_DIM

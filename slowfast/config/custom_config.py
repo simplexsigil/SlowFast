@@ -17,3 +17,5 @@ def add_custom_config(_C):
     _C.TENSORBOARD.CWRECA.ENABLE = False
     _C.TENSORBOARD.CWPREC = CfgNode()
     _C.TENSORBOARD.CWPREC.ENABLE = False
+
+    _C.MODEL.RET_FEATS = False

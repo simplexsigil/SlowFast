@@ -53,7 +53,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
 
     for cur_iter, (inputs, labels, video_idx, time, meta) in enumerate(
             test_loader
-            ):
+    ):
+        feats = None
 
         if isinstance(labels, list) and len(labels) == 2:
             labels, label_names = labels
@@ -123,52 +124,63 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             probs = torch.mul(
                 retrieval_one_hot.view(batchSize, -1, C),
                 yd_transform.view(batchSize, -1, 1),
-                )
+            )
             preds = torch.sum(probs, 1)
         else:
             # Perform the forward pass.
             preds = model(inputs)
+
+            if isinstance(preds, tuple):
+                preds, feats = preds
+
         # Gather all the predictions across all the devices to perform ensemble.
         if cfg.NUM_GPUS > 1:
-            preds, labels, video_idx = du.all_gather([preds, labels, video_idx])
+            if feats is not None:
+                preds, labels, video_idx, feats = du.all_gather([preds, labels, video_idx, feats])
+            else:
+                preds, labels, video_idx = du.all_gather([preds, labels, video_idx])
         if cfg.NUM_GPUS:
             preds = preds.cpu()
             labels = labels.cpu()
             video_idx = video_idx.cpu()
+            feats = feats.cpu() if feats is not None else None
 
         test_meter.iter_toc()
 
         if not cfg.VIS_MASK.ENABLE:
             # Update and log stats.
             test_meter.update_stats(
-                preds.detach(), labels.detach(), video_idx.detach()
-                )
+                preds.detach(), labels.detach(), video_idx.detach(), feats.detach() if feats is not None else None
+            )
         test_meter.log_iter_stats(cur_iter)
 
         test_meter.iter_tic()
 
-    # Log epoch stats and print the final testing results.
-    if not cfg.DETECTION.ENABLE:
-        all_preds = test_meter.video_preds.clone().detach()
-        all_labels = test_meter.video_labels
-        if cfg.NUM_GPUS:
-            all_preds = all_preds.cpu()
-            all_labels = all_labels.cpu()
-        if writer is not None:
-            writer.plot_eval(preds=all_preds, labels=all_labels)
-
-        if cfg.TEST.SAVE_RESULTS_PATH != "":
-            save_path = os.path.join(cfg.OUTPUT_DIR, cfg.TEST.SAVE_RESULTS_PATH)
-
-            if du.is_root_proc():
-                with pathmgr.open(save_path, "wb") as f:
-                    pickle.dump([all_preds, all_labels], f)
-
-            logger.info(
-                "Successfully saved prediction results to {}".format(save_path)
-                )
-
     test_meter.finalize_metrics()
+
+    # Log epoch stats and print the final testing results.
+    all_preds = test_meter.video_preds.clone().detach()
+    all_labels = test_meter.video_labels
+    if cfg.NUM_GPUS:
+        all_preds = all_preds.cpu()
+        all_labels = all_labels.cpu()
+    if writer is not None:
+        writer.plot_eval(preds=all_preds, labels=all_labels)
+
+    if cfg.TEST.SAVE_RESULTS_PATH != "":
+        save_path = os.path.join(cfg.OUTPUT_DIR, cfg.TEST.SAVE_RESULTS_PATH)
+
+        if du.is_root_proc():
+            to_dump = [all_preds, all_labels]
+            if test_meter.video_feats is not None:
+                to_dump.append(test_meter.video_feats)
+
+            with pathmgr.open(save_path, "wb") as f:
+                pickle.dump(to_dump, f)
+
+        logger.info("Successfully saved prediction results{} to {}".format(
+            " and features" if test_meter.video_feats is not None else "", save_path))
+
     return test_meter
 
 
@@ -206,7 +218,7 @@ def test(cfg):
             model.eval()
             flops, params = misc.log_model_info(
                 model, cfg, use_train_input=False
-                )
+            )
 
         if du.is_master_proc() and cfg.LOG_MODEL_INFO:
             misc.log_model_info(model, cfg, use_train_input=False)
@@ -247,12 +259,12 @@ def test(cfg):
                 len(test_loader),
                 cfg.DATA.MULTI_LABEL,
                 cfg.DATA.ENSEMBLE_METHOD,
-                )
+            )
 
         # Set up writer for logging to Tensorboard format.
         if cfg.TENSORBOARD.ENABLE and du.is_master_proc(
                 cfg.NUM_GPUS * cfg.NUM_SHARDS
-                ):
+        ):
             writer = tb.TensorboardWriter(cfg)
         else:
             writer = None
@@ -269,11 +281,11 @@ def test(cfg):
         logger.info(
             "Finalized testing with {} temporal clips and {} spatial crops".format(
                 view, cfg.TEST.NUM_SPATIAL_CROPS
-                )
             )
+        )
         result_string_views += "_{}a{}" "".format(
             view, test_meter.stats["top1_acc"]
-            )
+        )
 
         result_string = (
             "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}"
@@ -285,7 +297,7 @@ def test(cfg):
                 test_meter.stats["top5_acc"],
                 misc.gpu_mem_usage(),
                 flops,
-                )
+            )
         )
 
         logger.info("{}".format(result_string))
