@@ -105,13 +105,8 @@ class Nturgbd(torch.utils.data.Dataset):
         # Select the corresponding split: cross subject or cross view
         label_json = label_json[self.cfg.DATA.NTU_SPLIT]
 
-        self._video_names = []
-        self._labels = []
-        for video in label_json:
-            video_name = video["id"]
-            label = video["label"]
-            self._video_names.append(video_name)
-            self._labels.append(label)
+        self._video_names = [video["id"] for video in label_json]
+        self._labels = [video["label"] for video in label_json]
 
         # Loading path to file
         video_path_file = os.path.join(
@@ -130,11 +125,13 @@ class Nturgbd(torch.utils.data.Dataset):
         )
 
         # From dict to list.
-        new_paths, new_labels = [], []
-        for index in range(len(self._video_names)):
-            if self._video_names[index] in self._path_to_videos:
-                new_paths.append(self._path_to_videos[self._video_names[index]])
-                new_labels.append(self._labels[index])
+        new_labels = self._labels
+        new_paths = [self._path_to_videos[video_name] for video_name in self._video_names]
+        # new_paths, new_labels = [], []
+        # for index in range(len(self._video_names)):
+        #     if self._video_names[index] in self._path_to_videos:
+        #         new_paths.append(self._path_to_videos[self._video_names[index]])
+        #         new_labels.append(self._labels[index])
 
         self._labels = new_labels
         self._path_to_videos = new_paths

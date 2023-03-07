@@ -45,12 +45,19 @@ def get_kinetics_head(dim_in: int = 1024, num_classes: int = 400) -> nn.Module:
 @MODEL_REGISTRY.register()
 class OmnivoreDepth(nn.Module):
     """Omnivore depth model adapted to the slowfast repo."""
+
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
-        self.trunk = omnivore_swinB_depth(load_heads=False)
+
+        # load model based on the model size
+        if cfg.MODEL.OMNIVORE_SIZE not in _DEPTH_MODELS:
+            raise NotImplementedError(f"{cfg.MODEL.OMNIVORE_SIZE} not implemented.")
+
+        self.trunk = _DEPTH_MODELS[cfg.MODEL.OMNIVORE_SIZE](load_heads=False)
         self.head = nn.Linear(
-            in_features=1024, out_features=cfg.MODEL.NUM_CLASSES)
+            in_features=_HEAD_DIM[cfg.MODEL.OMNIVORE_SIZE], 
+            out_features=cfg.MODEL.NUM_CLASSES)
         self._freeze_fn()
 
     def forward(self, x: torch.Tensor):
@@ -208,6 +215,110 @@ def omnivore_swinB_depth(
     model = _omnivore_base(
         trunk=trunk,
         head_dim_in=1024,  # embed_dim * 8 = 128*8
+        progress=progress,
+        pretrained=pretrained,
+        load_heads=load_heads,
+        checkpoint_name=checkpoint_name,
+    )
+
+    if load_heads:
+        del model.trunk.patch_embed
+    else:
+        del model.patch_embed
+    return model
+
+
+def omnivore_swinS_depth(
+    pretrained: bool = True,
+    progress: bool = True,
+    load_heads: bool = True,
+    checkpoint_name: str = "omnivore_swinS",
+    **kwargs: Any,
+) -> nn.Module:
+    r"""
+    Omnivore model trunk: Swin S patch (2,4,4) window (8,7,7)
+
+    Args:
+        pretrained: if True loads weights from model trained on
+            Imagenet 1k, Kinetics 400, SUN RGBD.
+        progress: print progress of loading checkpoint
+        load_heads: if True, loads the 3 heads, one each for
+            image/video/rgbd prediction. If False loads only the
+            trunk.
+
+    Returns:
+        model: nn.Module of the omnivore model
+    """
+
+    # Only specify the non default values
+    trunk = SwinTransformer3D(
+        pretrained2d=False,
+        patch_size=(2, 4, 4),
+        embed_dim=96,
+        depths=[2, 2, 18, 2],
+        num_heads=[3, 6, 12, 24],
+        window_size=(8, 7, 7),
+        drop_path_rate=0.3,
+        patch_norm=True,  # Make this the default value?
+        input_modality='d',
+        **kwargs,
+    )
+
+    model = _omnivore_base(
+        trunk=trunk,
+        head_dim_in=768,  # embed_dim * 8 = 96*8
+        progress=progress,
+        pretrained=pretrained,
+        load_heads=load_heads,
+        checkpoint_name=checkpoint_name,
+    )
+
+    if load_heads:
+        del model.trunk.patch_embed
+    else:
+        del model.patch_embed
+    return model
+
+
+def omnivore_swinT_depth(
+    pretrained: bool = True,
+    progress: bool = True,
+    load_heads: bool = True,
+    checkpoint_name: str = "omnivore_swinT",
+    **kwargs: Any,
+) -> nn.Module:
+    r"""
+    Omnivore model trunk: Swin T patch (2,4,4) window (8,7,7)
+
+    Args:
+        pretrained: if True loads weights from model trained on
+            Imagenet 1k, Kinetics 400, SUN RGBD.
+        progress: print progress of loading checkpoint
+        load_heads: if True, loads the 3 heads, one each for
+            image/video/rgbd prediction. If False loads only the
+            trunk.
+
+    Returns:
+        model: nn.Module of the omnivore model
+    """
+
+    # Only specify the non default values
+    trunk = SwinTransformer3D(
+        pretrained2d=False,
+        patch_size=(2, 4, 4),
+        embed_dim=96,
+        depths=[2, 2, 6, 2],
+        num_heads=[3, 6, 12, 24],
+        window_size=(8, 7, 7),
+        drop_path_rate=0.3,
+        patch_norm=True,  # Make this the default value?
+        input_modality='d',
+        **kwargs,
+    )
+
+    model = _omnivore_base(
+        trunk=trunk,
+        head_dim_in=768,  # embed_dim * 8 = 96*8
         progress=progress,
         pretrained=pretrained,
         load_heads=load_heads,
@@ -548,3 +659,16 @@ def omnivore_swinL_kinetics600(
         heads=heads,
         **kwargs,
     )
+
+
+_DEPTH_MODELS = {
+    "tiny": omnivore_swinT_depth,
+    "small": omnivore_swinS_depth,
+    "base": omnivore_swinB_depth,
+}
+
+_HEAD_DIM = {
+    "tiny": 768,
+    "small": 768,
+    "base": 768,
+}

@@ -14,4 +14,5 @@ def add_custom_config(_C):
     _C.DATA.MIN_DEPTH = 0.089223  # Min disparity value in the dataset
     _C.DATA.NTU_SPLIT = "xsub"  # cross subject or cross view
     _C.MODEL.OMNIVORE_FROZEN_STAGE = 0  # 0 means only patch embed and classifier are trainable
+    _C.MODEL.OMNIVORE_SIZE = "base"  # tiny, small, or base
     pass
