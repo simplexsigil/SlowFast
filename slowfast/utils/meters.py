@@ -261,6 +261,7 @@ class TestMeter(object):
             overall_iters,
             multi_label=False,
             ensemble_method="sum",
+            replace_with=((-1, 0))
     ):
         """
         Construct tensors to store the predictions and labels. Expect to get
@@ -288,6 +289,9 @@ class TestMeter(object):
         self.idx_mask = np.array([False] * num_videos)
         self.video_preds = torch.zeros((num_videos, num_cls))
         self.video_feats = None
+        self.no_stats = no_stats
+        self.replace_with = replace_with
+
         if multi_label:
             self.video_preds -= 1e10
 
@@ -313,7 +317,7 @@ class TestMeter(object):
             self.video_preds -= 1e10
         self.video_labels.zero_()
 
-    def update_stats(self, preds, labels, clip_ids, feats=None):
+    def update_stats(self, preds: torch.Tensor, labels: torch.Tensor, clip_ids, feats=None):
         """
         Collect the predictions from the current batch and perform on-the-flight
         summation as ensemble.
@@ -326,6 +330,11 @@ class TestMeter(object):
             clip_ids (tensor): clip indexes of the current batch, dimension is
                 N.
         """
+        for k, v in self.replace_with:
+            if any(labels == k):
+                print(f"Replacing {k} with {v}")
+                labels[[labels == k]] = v
+
         for ind in range(preds.shape[0]):
             vid_id = int(clip_ids[ind]) // self.num_clips
             if self.video_labels[vid_id].sum() > 0:
