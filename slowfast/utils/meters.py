@@ -444,7 +444,8 @@ class TestMeter(object):
 
         logging.log_json_stats(self.stats)
 
-        self.video_feats = self.video_feats / self.clip_count.unsqueeze(-1)
+        if self.video_feats is not None:
+            self.video_feats = self.video_feats / self.num_clips
 
 
 class ScalarMeter(object):
