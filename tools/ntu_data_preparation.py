@@ -54,9 +54,12 @@ def prepare_annotations():
 def get_ntu_path_to_videos(
         root_path='/pfs/work8/workspace/ffuc/scratch/on3546-datasets/NTURGBD',
 ):
-    seq_prefix = 'nturgb+d_depth_masked_'
+    depth_seq_prefix = 'nturgb+d_depth_masked_'
+    rgb_seq_prefix = 'nturgb+d_rgb_'
     annotation_path = os.path.join(root_path, 'annotations')
-    root_path = os.path.join(root_path, 'nturgb+d_depth_masked')
+
+    depth_root_path = os.path.join(root_path, 'nturgb+d_depth_masked')
+    rgb_root_path = os.path.join(root_path, 'nturgb+d_rgb')
 
     for mode in ['train', 'validation']:
         with open(os.path.join(annotation_path, f'{mode}.json'), 'r') as f:
@@ -64,12 +67,24 @@ def get_ntu_path_to_videos(
 
         for split in ['xsub', 'xview']:
             video_list = [item['id'] for item in data[split]]
-            res = {}
+            res = {'depth': {}, 'rgb': {}}
             i = 0
+
             for video in tqdm(video_list, desc=f'{mode}, {split}'):
+                # rgb
+                rgb_video_path = os.path.join(
+                    rgb_root_path,
+                    '{}{}'.format(rgb_seq_prefix, video[:4].lower()),
+                    f'{video}_rgb.avi')
+                if not os.path.exists(rgb_video_path):
+                    print(f'No rgb videos in {rgb_video_path}')
+
+                res['rgb'][video] = rgb_video_path
+
+                # depth
                 seq_path = os.path.join(
-                    root_path,
-                    '{}{}'.format(seq_prefix, video[:4].lower())
+                    depth_root_path,
+                    '{}{}'.format(depth_seq_prefix, video[:4].lower())
                 )
                 image_paths = sorted(glob.glob(os.path.join(seq_path, video, '*.png')))
 
@@ -77,7 +92,7 @@ def get_ntu_path_to_videos(
                     i += 1
                     print(f'No pngs in {os.path.join(seq_path, video)}')
 
-                res[video] = image_paths
+                res['depth'][video] = image_paths
 
             save_path = os.path.join(
                 annotation_path,
@@ -86,8 +101,8 @@ def get_ntu_path_to_videos(
             with open(save_path, 'w') as f:
                 json.dump(res, f)
 
-            n_videos = len(res)
-            n_images = sum([len(res[key]) for key in res])
+            n_videos = len(res['depth'])
+            n_images = sum([len(res['depth'][key]) for key in res['depth']])
             print(f"Discarded {i} videos.")
             print(f"Saved data corresponding to {n_videos} videos and {n_images} images to {save_path}.")
 
@@ -101,6 +116,6 @@ def test_json():
 
 
 if __name__ == "__main__":
-    get_ntu_path_to_videos()
+    get_ntu_path_to_videos(root_path="/home/zhong/Documents/datasets/NTU_60")
     # test_json()
     # prepare_annotations()

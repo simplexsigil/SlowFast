@@ -788,7 +788,7 @@ class SwinTransformer3D(nn.Module):
         self.window_size = window_size
         self.patch_size = patch_size
         self.input_modality = input_modality
-        assert input_modality in ['rgb', 'd']
+        assert input_modality in ['rgb', 'd', 'rgbd']
 
         depth_chans = None
         # assert in_chans == 3, "Only 3 channels supported"
@@ -1109,8 +1109,16 @@ class SwinTransformer3D(nn.Module):
         if self.input_modality == 'd':
             assert x.shape[1] == 1
             x = self.depth_patch_embed(x)
-        else:
+        elif self.input_modality == 'rgb':
             x = self.patch_embed(x)
+        else:
+            assert x.shape[1] == 4
+            x_rgb = x[:, :3, ...]
+            x_d = x[:, 3:, ...]
+            x_d = self.depth_patch_embed(x_d)
+            x_rgb = self.patch_embed(x_rgb)
+            # sum the two sets of tokens
+            x = x_rgb + x_d
         return x
 
     def forward(
