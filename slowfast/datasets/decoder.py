@@ -665,7 +665,7 @@ def decode(
             frames, time_diff_aug[k] = transform.augment_raw_frames(
                 frames, time_diff_prob, gaussian_prob
             )
-        frames_k, index_k = temporal_sampling(frames, start_idx, end_idx, T)
+        frames_k = temporal_sampling(frames, start_idx, end_idx, T)
         frames_out[k] = frames_k
 
     # if we shuffle, need to randomize the output, otherwise it will always be past->future
