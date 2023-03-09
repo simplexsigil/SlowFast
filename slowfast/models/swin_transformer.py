@@ -772,7 +772,7 @@ class SwinTransformer3D(nn.Module):
         norm_layer=nn.LayerNorm,
         patch_norm=False,
         frozen_stages=-1,
-        input_modality='rgb',  # 'rgb', 'd', 'rgbd
+        input_modality='RGB',  # 'RGB', 'Depth', 'RGBD
     ):
         super().__init__()
 
@@ -788,10 +788,7 @@ class SwinTransformer3D(nn.Module):
         self.window_size = window_size
         self.patch_size = patch_size
         self.input_modality = input_modality
-        assert input_modality in ['rgb', 'd', 'rgbd']
-
-        depth_chans = None
-        # assert in_chans == 3, "Only 3 channels supported"
+        assert input_modality in ['RGB', 'Depth', 'RGBD']
 
         # split image into non-overlapping patches
         self.patch_embed = PatchEmbed3D(
@@ -800,13 +797,12 @@ class SwinTransformer3D(nn.Module):
             embed_dim=embed_dim,
             norm_layer=norm_layer if self.patch_norm else None,
         )
-        if 'd' in input_modality:
-            self.depth_patch_embed = PatchEmbed3D(
-                patch_size=patch_size,
-                in_chans=depth_in_chans,
-                embed_dim=embed_dim,
-                norm_layer=norm_layer if self.patch_norm else None,
-            )
+        self.depth_patch_embed = PatchEmbed3D(
+            patch_size=patch_size,
+            in_chans=depth_in_chans,
+            embed_dim=embed_dim,
+            norm_layer=norm_layer if self.patch_norm else None,
+        )
 
         self.pos_drop = nn.Dropout(p=drop_rate)
 
@@ -1106,10 +1102,11 @@ class SwinTransformer3D(nn.Module):
         # x: B x C x T x H x W
         assert x.ndim == 5
 
-        if self.input_modality == 'd':
+        if self.input_modality == 'Depth':
             assert x.shape[1] == 1
             x = self.depth_patch_embed(x)
-        elif self.input_modality == 'rgb':
+        elif self.input_modality == 'RGB':
+            assert x.shape[1] == 3
             x = self.patch_embed(x)
         else:
             assert x.shape[1] == 4

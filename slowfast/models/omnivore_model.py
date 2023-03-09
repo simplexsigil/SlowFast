@@ -54,7 +54,10 @@ class OmnivoreDepth(nn.Module):
         if cfg.MODEL.OMNIVORE_SIZE not in _DEPTH_MODELS:
             raise NotImplementedError(f"{cfg.MODEL.OMNIVORE_SIZE} not implemented.")
 
-        self.trunk = _DEPTH_MODELS[cfg.MODEL.OMNIVORE_SIZE](load_heads=False)
+        self.trunk = _DEPTH_MODELS[cfg.MODEL.OMNIVORE_SIZE](
+            load_heads=False,
+            modality=cfg.DATA.MODALITY,
+        )
         self.head = nn.Linear(
             in_features=_HEAD_DIM[cfg.MODEL.OMNIVORE_SIZE], 
             out_features=cfg.MODEL.NUM_CLASSES)
@@ -208,7 +211,7 @@ def omnivore_swinB_depth(
         window_size=(16, 7, 7),
         drop_path_rate=0.3,  # TODO: set this based on the final models
         patch_norm=True,  # Make this the default value?
-        input_modality='d',
+        input_modality=kwargs.pop('modality', 'Depth'),
         **kwargs,
     )
 
@@ -220,11 +223,6 @@ def omnivore_swinB_depth(
         load_heads=load_heads,
         checkpoint_name=checkpoint_name,
     )
-
-    if load_heads:
-        del model.trunk.patch_embed
-    else:
-        del model.patch_embed
     return model
 
 
@@ -260,7 +258,7 @@ def omnivore_swinS_depth(
         window_size=(8, 7, 7),
         drop_path_rate=0.3,
         patch_norm=True,  # Make this the default value?
-        input_modality='d',
+        input_modality=kwargs.pop('modality', 'Depth'),
         **kwargs,
     )
 
@@ -272,11 +270,6 @@ def omnivore_swinS_depth(
         load_heads=load_heads,
         checkpoint_name=checkpoint_name,
     )
-
-    if load_heads:
-        del model.trunk.patch_embed
-    else:
-        del model.patch_embed
     return model
 
 
@@ -312,7 +305,7 @@ def omnivore_swinT_depth(
         window_size=(8, 7, 7),
         drop_path_rate=0.3,
         patch_norm=True,  # Make this the default value?
-        input_modality='d',
+        input_modality=kwargs.pop('modality', 'Depth'),
         **kwargs,
     )
 
@@ -324,11 +317,6 @@ def omnivore_swinT_depth(
         load_heads=load_heads,
         checkpoint_name=checkpoint_name,
     )
-
-    if load_heads:
-        del model.trunk.patch_embed
-    else:
-        del model.patch_embed
     return model
 
 
@@ -670,5 +658,5 @@ _DEPTH_MODELS = {
 _HEAD_DIM = {
     "tiny": 768,
     "small": 768,
-    "base": 768,
+    "base": 1024,
 }

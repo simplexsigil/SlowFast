@@ -15,6 +15,9 @@ import simplejson
 import slowfast.utils.distributed as du
 from slowfast.utils.env import pathmgr
 
+# https://stackoverflow.com/questions/67351960/unknown-python-debug-statements-appear
+logging.getLogger('PIL').setLevel(logging.WARNING)
+
 
 def _suppress_print():
     """

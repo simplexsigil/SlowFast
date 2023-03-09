@@ -90,7 +90,16 @@ def _get_model_analysis_input(cfg, use_train_input):
     Returns:
         inputs: the input for model analysis.
     """
-    rgb_dimension = 3 if cfg.DATA.MODALITY == "RGB" else 1
+    _MODALITY_CHANNEL = {
+        'RGB': 3,
+        'RGBD': 4,
+        'Depth': 1,
+    }
+
+    if cfg.DATA.MODALITY not in _MODALITY_CHANNEL:
+        raise NotImplementedError(f"Modality {cfg.DATA.MODALITY} not supported.")
+
+    rgb_dimension = _MODALITY_CHANNEL[cfg.DATA.MODALITY]
     if use_train_input:
         if "imagenet" in cfg.TRAIN.DATASET:
             input_tensors = torch.rand(

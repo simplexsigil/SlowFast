@@ -371,6 +371,7 @@ def aug_frame(
     min_scale,
     max_scale,
     crop_size,
+    is_depth=False,
 ):
     """
     Perform augmentations on the given video frames, including
@@ -398,7 +399,7 @@ def aug_frame(
             input_size=(frames.size(1), frames.size(2)),
             auto_augment=cfg.AUG.AA_TYPE,
             interpolation=cfg.AUG.INTERPOLATION,
-            is_depth=(cfg.DATA.MODALITY == "Depth"),
+            is_depth=is_depth,
         )
         # T H W C -> T C H W.
         frames = frames.permute(0, 3, 1, 2)
@@ -407,7 +408,12 @@ def aug_frame(
         frames = _list_img_to_frames(list_img)
         frames = frames.permute(0, 2, 3, 1)
 
-    frames = tensor_normalize(frames, cfg.DATA.MEAN, cfg.DATA.STD)
+    frames = tensor_normalize(
+        frames,
+        cfg.DATA.MEAN if not is_depth or cfg.DATA.MEAN_DEPTH is None else cfg.DATA.MEAN_DEPTH,
+        cfg.DATA.STD if not is_depth or cfg.DATA.STD_DEPTH is None else cfg.DATA.STD_DEPTH,
+    )
+
     # T H W C -> C T H W.
     frames = frames.permute(3, 0, 1, 2)
     # Perform data augmentation.

@@ -8,12 +8,15 @@ import random
 from itertools import chain as chain
 import torch
 import torch.utils.data
+import torchvision.io
 
 import slowfast.utils.logging as logging
 from slowfast.utils.env import pathmgr
 
 from . import utils as utils
 from . import transform as transform
+from . import video_container as container
+from . import decoder as decoder
 from .build import DATASET_REGISTRY
 
 logger = logging.get_logger(__name__)
@@ -58,7 +61,10 @@ class Nturgbdmultimodal(torch.utils.data.Dataset):
         self.mode = mode
         self.cfg = cfg
         self.modality = self.cfg.DATA.MODALITY
-        assert self.modality in ["rgb", "depth", "rgbd"]
+
+        assert self.modality in ['RGB', 'Depth', 'RGBD']
+        self.use_depth = self.modality in ['Depth', 'RGBD']
+        self.use_rgb = self.modality in ['RGB', 'RGBD']
 
         self._video_meta = {}
         self._num_retries = num_retries
@@ -117,27 +123,31 @@ class Nturgbdmultimodal(torch.utils.data.Dataset):
         with pathmgr.open(video_path_file, "r") as f:
             self._path_to_videos = json.load(f)
 
-        assert len(self._path_to_videos) == len(self._video_names), (
-            len(self._path_to_videos),
+
+        self._path_to_rgb_videos = self._path_to_videos['rgb']
+        self._path_to_depth_videos = self._path_to_videos['depth']
+
+        assert (len(self._path_to_rgb_videos)
+                == len(self._path_to_depth_videos)
+                == len(self._video_names)), (
+            len(self._path_to_rgb_videos),
+            len(self._path_to_depth_videos),
             len(self._video_names),
         )
 
         # From dict to list.
-        new_labels = self._labels
-        new_paths = [self._path_to_videos[video_name] for video_name in self._video_names]
-        # new_paths, new_labels = [], []
-        # for index in range(len(self._video_names)):
-        #     if self._video_names[index] in self._path_to_videos:
-        #         new_paths.append(self._path_to_videos[self._video_names[index]])
-        #         new_labels.append(self._labels[index])
-
-        self._labels = new_labels
-        self._path_to_videos = new_paths
+        self._path_to_rgb_videos = [self._path_to_rgb_videos[video_name] for video_name in self._video_names]
+        self._path_to_depth_videos = [self._path_to_depth_videos[video_name] for video_name in self._video_names]
 
         # Extend self when self._num_clips > 1 (during testing).
-        self._path_to_videos = list(
+        self._path_to_rgb_videos = list(
             chain.from_iterable(
-                [[x] * self._num_clips for x in self._path_to_videos]
+                [[x] * self._num_clips for x in self._path_to_rgb_videos]
+            )
+        )
+        self._path_to_depth_videos = list(
+            chain.from_iterable(
+                [[x] * self._num_clips for x in self._path_to_depth_videos]
             )
         )
         self._labels = list(
@@ -147,14 +157,14 @@ class Nturgbdmultimodal(torch.utils.data.Dataset):
             chain.from_iterable(
                 [
                     range(self._num_clips)
-                    for _ in range(len(self._path_to_videos))
+                    for _ in range(len(self._path_to_rgb_videos))
                 ]
             )
         )
         logger.info(
-            "NTURGBD dataloader constructed "
+            "NTURGBD rgb + depth dataloader constructed "
             " (size: {}) from {}".format(
-                len(self._path_to_videos), video_path_file
+                len(self._path_to_rgb_videos), video_path_file
             )
         )
 
@@ -167,7 +177,7 @@ class Nturgbdmultimodal(torch.utils.data.Dataset):
             seq (list): the indexes of frames of sampled from the video.
         """
         num_frames = self.cfg.DATA.NUM_FRAMES
-        video_length = len(self._path_to_videos[index])
+        video_length = len(self._path_to_depth_videos[index])
         assert video_length > 0
 
         seg_size = float(video_length - 1) / num_frames
@@ -194,6 +204,8 @@ class Nturgbdmultimodal(torch.utils.data.Dataset):
             label (int): the label of the current video.
             index (int): the index of the video.
         """
+        index = 0
+
         short_cycle_idx = None
         # When short cycle is used, input index is a tupple.
         if isinstance(index, tuple):
@@ -242,27 +254,37 @@ class Nturgbdmultimodal(torch.utils.data.Dataset):
             )
 
         label = self._labels[index]
-
         seq = self.get_seq_frames(index)
 
-        frames = torch.as_tensor(
-            utils.retry_load_images(
-                [self._path_to_videos[index][frame] for frame in seq],
-                self._num_retries,
-                is_depth=(self.modality == "Depth"),
+        #---------------Depth----------------
+        frames = None
+        if self.use_depth:
+            frames = torch.as_tensor(
+                utils.retry_load_images(
+                    [self._path_to_depth_videos[index][frame] for frame in seq],
+                    self._num_retries,
+                    is_depth=True,
+                )
             )
-        )
 
-        # Use disparity instead of depth (in meter).
-        frames[frames == 0] = float("inf")
-        frames = 1000 / frames
+            # Use disparity instead of depth (in meter).
+            frames[frames == 0] = float("inf")
+            frames = 1000 / frames
 
-        # Min-max normalization => [0, 1]
-        min_max_fn = transform.DepthNorm(
-            max_depth=self.cfg.DATA.MAX_DEPTH,
-            min_depth=self.cfg.DATA.MIN_DEPTH,
-        )
-        frames = min_max_fn(frames)
+            # Min-max normalization => [0, 1]
+            min_max_fn = transform.DepthNorm(
+                max_depth=self.cfg.DATA.MAX_DEPTH,
+                min_depth=self.cfg.DATA.MIN_DEPTH,
+            )
+            frames = min_max_fn(frames)
+
+        # ---------------RGB----------------
+        rgb_frames = None
+        if self.use_rgb:
+            video_path = self._path_to_rgb_videos[index]
+            rgb_frames = torchvision.io.read_video(video_path)[0]  # T H W C
+            # Select the same frames as the depth input
+            rgb_frames = rgb_frames[torch.tensor(seq), ...]
 
         if self.aug:
             if self.cfg.AUG.NUM_SAMPLE > 1:
@@ -271,7 +293,50 @@ class Nturgbdmultimodal(torch.utils.data.Dataset):
                 label_list = []
                 index_list = []
                 for _ in range(self.cfg.AUG.NUM_SAMPLE):
-                    new_frames = utils.aug_frame(
+                    if frames is not None:
+                        frames = utils.aug_frame(
+                            self.cfg,
+                            self.mode,
+                            self.rand_erase,
+                            frames,
+                            spatial_sample_index,
+                            min_scale,
+                            max_scale,
+                            crop_size,
+                            is_depth=True,
+                        )
+                        frames = utils.pack_pathway_output(self.cfg, frames)
+                    if rgb_frames is not None:
+                        rgb_frames = utils.aug_frame(
+                            self.cfg,
+                            self.mode,
+                            self.rand_erase,
+                            rgb_frames,
+                            spatial_sample_index,
+                            min_scale,
+                            max_scale,
+                            crop_size,
+                            is_depth=False,
+                        )
+                        rgb_frames = utils.pack_pathway_output(self.cfg, rgb_frames)
+
+                    if frames is None:
+                        assert rgb_frames is not None
+                        frame_list.append(rgb_frames)
+                    elif rgb_frames is None:
+                        assert frames is not None
+                        frame_list.append(frames)
+                    else:
+                        # Concatenate rgb and depth in channel dim
+                        new_frames = [torch.cat([rgb, d], dim=0) for rgb, d in zip(rgb_frames, frames)]
+                        frame_list.append(new_frames)
+                    label_list.append(label)
+                    index_list.append(index)
+                return frame_list, label_list, index_list, [0] * self.cfg.AUG.NUM_SAMPLE, {}
+
+            else:
+                if frames is not None:
+                    frames = utils.aug_frame(
                         self.cfg,
                         self.mode,
                         self.rand_erase,
@@ -280,43 +345,74 @@ class Nturgbdmultimodal(torch.utils.data.Dataset):
                         min_scale,
                         max_scale,
                         crop_size,
+                        is_depth=True,
                     )
-                    new_frames = utils.pack_pathway_output(self.cfg, new_frames)
-                    frame_list.append(new_frames)
-                    label_list.append(label)
-                    index_list.append(index)
-                return frame_list, label_list, index_list, [0] * self.cfg.AUG.NUM_SAMPLE, {}
-
-            else:
-                frames = utils.aug_frame(
-                    self.cfg,
-                    self.mode,
-                    self.rand_erase,
-                    frames,
-                    spatial_sample_index,
-                    min_scale,
-                    max_scale,
-                    crop_size,
-                )
+                if rgb_frames is not None:
+                    rgb_frames = utils.aug_frame(
+                        self.cfg,
+                        self.mode,
+                        self.rand_erase,
+                        rgb_frames,
+                        spatial_sample_index,
+                        min_scale,
+                        max_scale,
+                        crop_size,
+                        is_depth=False,
+                    )
         else:
             # Perform color normalization.
-            frames = utils.tensor_normalize(
-                frames, self.cfg.DATA.MEAN, self.cfg.DATA.STD
-            )
+            if frames is not None:
+                frames = utils.tensor_normalize(
+                    frames,
+                    self.cfg.DATA.MEAN_DEPTH,
+                    self.cfg.DATA.STD_DEPTH,
+                )
+                # T H W C -> C T H W.
+                frames = frames.permute(3, 0, 1, 2)
+                # Perform data augmentation.
+                frames = utils.spatial_sampling(
+                    frames,
+                    spatial_idx=spatial_sample_index,
+                    min_scale=min_scale,
+                    max_scale=max_scale,
+                    crop_size=crop_size,
+                    random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
+                    inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
+                )
 
-            # T H W C -> C T H W.
-            frames = frames.permute(3, 0, 1, 2)
-            # Perform data augmentation.
-            frames = utils.spatial_sampling(
-                frames,
-                spatial_idx=spatial_sample_index,
-                min_scale=min_scale,
-                max_scale=max_scale,
-                crop_size=crop_size,
-                random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
-                inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
-            )
-        frames = utils.pack_pathway_output(self.cfg, frames)
+            if rgb_frames is not None:
+                rgb_frames = utils.tensor_normalize(
+                    frames,
+                    self.cfg.DATA.MEAN,
+                    self.cfg.DATA.STD,
+                )
+                # T H W C -> C T H W.
+                rgb_frames = rgb_frames.permute(3, 0, 1, 2)
+                # Perform data augmentation.
+                rgb_frames = utils.spatial_sampling(
+                    rgb_frames,
+                    spatial_idx=spatial_sample_index,
+                    min_scale=min_scale,
+                    max_scale=max_scale,
+                    crop_size=crop_size,
+                    random_horizontal_flip=self.cfg.DATA.RANDOM_FLIP,
+                    inverse_uniform_sampling=self.cfg.DATA.INV_UNIFORM_SAMPLE,
+                )
+
+        if frames is not None:
+            frames = utils.pack_pathway_output(self.cfg, frames)
+        if rgb_frames is not None:
+            rgb_frames = utils.pack_pathway_output(self.cfg, rgb_frames)
+
+        if frames is None:
+            assert rgb_frames is not None
+            frames = rgb_frames
+        elif rgb_frames is None:
+            assert frames is not None
+        else:
+            # Concatenate rgb and depth in channel dim
+            frames = [torch.cat([rgb, d], dim=0) for rgb, d in zip(rgb_frames, frames)]
+
         return frames, label, index, 0, {}
 
     def __len__(self):
@@ -332,4 +428,4 @@ class Nturgbdmultimodal(torch.utils.data.Dataset):
         Returns:
             (int): the number of videos in the dataset.
         """
-        return len(self._path_to_videos)
+        return len(self._path_to_rgb_videos)

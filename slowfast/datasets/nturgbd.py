@@ -282,6 +282,7 @@ class Nturgbd(torch.utils.data.Dataset):
                         min_scale,
                         max_scale,
                         crop_size,
+                        is_depth=True,
                     )
                     new_frames = utils.pack_pathway_output(self.cfg, new_frames)
                     frame_list.append(new_frames)
@@ -299,6 +300,7 @@ class Nturgbd(torch.utils.data.Dataset):
                     min_scale,
                     max_scale,
                     crop_size,
+                    is_depth=True,
                 )
         else:
             # Perform color normalization.

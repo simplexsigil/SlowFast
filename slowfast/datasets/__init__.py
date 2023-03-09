@@ -10,7 +10,8 @@ from .amarv import Amarv # noqa
 from .ssv2 import Ssv2  # noqa
 from .amarv_tmp import Amarvtmp  # noqa
 from .nturgbd import Nturgbd  # noqa
-from .nturgbd_tmp import Nturgbdtmp
+from .nturgbd_tmp import Nturgbdtmp  # noqa
+from .nturgbd_multimodal import Nturgbdmultimodal  # noqa
 
 try:
     from .ptv_datasets import Ptvcharades, Ptvkinetics, Ptvssv2  # noqa

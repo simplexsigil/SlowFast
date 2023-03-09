@@ -408,7 +408,7 @@ def torchvision_decode(
 
     all_duration = video_meta["video_duration"]  # if "video_duration" in video_meta else len(v_frames[0])
 
-    if abs(expected_duration - all_duration) > 0.2:
+    if expected_duration is not None and abs(expected_duration - all_duration) > 0.2:
         print(f'The actual length: {all_duration}')
         print(f'Expected duration: {expected_duration}')
         logger.warning(f"The actual length of the video file is off by {all_duration - expected_duration} seconds."
@@ -522,7 +522,7 @@ def decode(
         max_delta=math.inf,
         temporally_rnd_clips=True,
         decode_boundaries=None,
-        expected_duration=None
+        expected_duration=None,
 ):
     """
     Decode the video and perform temporal sampling.
@@ -665,7 +665,7 @@ def decode(
             frames, time_diff_aug[k] = transform.augment_raw_frames(
                 frames, time_diff_prob, gaussian_prob
             )
-        frames_k = temporal_sampling(frames, start_idx, end_idx, T)
+        frames_k, index_k = temporal_sampling(frames, start_idx, end_idx, T)
         frames_out[k] = frames_k
 
     # if we shuffle, need to randomize the output, otherwise it will always be past->future
