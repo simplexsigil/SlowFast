@@ -290,7 +290,6 @@ class TestMeter(object):
         self.idx_mask = np.array([False] * num_videos)
         self.video_preds = torch.zeros((num_videos, num_cls))
         self.video_feats = None
-        self.no_stats = no_stats
         self.replace_with = replace_with
         self.do_stats = do_stats
 
