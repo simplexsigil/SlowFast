@@ -261,7 +261,7 @@ class TestMeter(object):
             overall_iters,
             multi_label=False,
             ensemble_method="sum",
-            replace_with=((-1, 0)),
+            replace_with=((-1, 0),),
             do_stats=True
     ):
         """
