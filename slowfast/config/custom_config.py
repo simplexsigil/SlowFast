@@ -20,3 +20,4 @@ def add_custom_config(_C):
 
     _C.MODEL.RET_FEATS = False
     _C.DO_STATS=True
+    _C.DEBUG=False

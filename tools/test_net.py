@@ -181,6 +181,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             to_dump = [all_preds, all_labels]
             if test_meter.video_feats is not None:
                 to_dump.append(test_meter.video_feats)
+            if test_meter.meta is not None:
+                to_dump.append(test_meter.meta)
 
             with pathmgr.open(save_path, "wb") as f:
                 pickle.dump(to_dump, f)

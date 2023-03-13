@@ -162,6 +162,9 @@ class Amarv(torch.utils.data.Dataset):
             else:
                 rows = f.read().splitlines()
 
+            if self.cfg.DEBUG:
+                rows = rows[:20]
+
             data_path_prefixes = os.path.expandvars(self.cfg.DATA.PATH_PREFIX)
             data_paths = data_path_prefixes.split(";")
 
@@ -182,7 +185,6 @@ class Amarv(torch.utils.data.Dataset):
 
                     if len(existing_sequence_paths) == 0:
                         print(f"Warning: not a single sequence found for path {dp}")
-
                 else:
                     existing_sequence_paths = glob.glob(os.path.join(dp, "**/sequence_*"), recursive=True)
 
@@ -199,8 +201,6 @@ class Amarv(torch.utils.data.Dataset):
                 for seq_path in existing_sequence_paths:
                     rel_seq_path = os.path.relpath(seq_path, dp)
                     rel_sample_path = os.path.split(rel_seq_path)[0]
-
-                    # seq_path = os.path.join(path_base, seq_path)
 
                     if rel_sample_path not in spm:
                         spm[rel_sample_path] = [seq_path]

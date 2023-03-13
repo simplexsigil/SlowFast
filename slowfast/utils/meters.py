@@ -484,6 +484,12 @@ class TestMeter(object):
         if self.video_feats is not None:
             self.video_feats = self.video_feats / self.num_clips
 
+        for key, val in self.meta.items():
+            if isinstance(val, (list,)):
+                self.meta[key] = val[::self.num_clips]
+            else:
+                raise ValueError
+
 
 class ScalarMeter(object):
     """
