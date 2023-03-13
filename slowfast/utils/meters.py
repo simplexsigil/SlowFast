@@ -301,6 +301,9 @@ class TestMeter(object):
             if multi_label
             else torch.zeros((num_videos)).long()
         )
+
+        self.meta = {}
+
         self.clip_count = torch.zeros((num_videos)).long()
         self.topk_accs = []
         self.stats = {}
@@ -318,7 +321,21 @@ class TestMeter(object):
             self.video_preds -= 1e10
         self.video_labels.zero_()
 
-    def update_stats(self, preds: torch.Tensor, labels: torch.Tensor, clip_ids, feats=None):
+
+    def update_meta(self, meta):
+        for key, val in meta.items():
+            if key not in self.meta:
+                if isinstance(val, torch.Tensor):
+                    self.meta[key] = [float(v) for v in val]
+                else:
+                    self.meta[key] = val
+            else:
+                if isinstance(val, (list,)):
+                    self.meta[key].extend(val)
+                elif isinstance(val, torch.Tensor):
+                    self.meta[key].extend([v.item() for v in val])
+
+    def update_stats(self, preds: torch.Tensor, labels: torch.Tensor, clip_ids, feats=None, meta=None):
         """
         Collect the predictions from the current batch and perform on-the-flight
         summation as ensemble.
@@ -366,6 +383,8 @@ class TestMeter(object):
 
             self.clip_count[vid_id] += 1
 
+        self.update_meta(meta)
+
     def log_iter_stats(self, cur_iter, ks=(1,)):
         """
         Log the stats.
@@ -395,10 +414,10 @@ class TestMeter(object):
             }
         else:
             stats = {
-                "split":       "test_iter",
-                "cur_iter":    "{}".format(cur_iter + 1),
-                "eta":         eta,
-                }
+                "split": "test_iter",
+                "cur_iter": "{}".format(cur_iter + 1),
+                "eta": eta,
+            }
 
         logging.log_json_stats(stats)
 

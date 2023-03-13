@@ -72,7 +72,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             for key, val in meta.items():
                 if isinstance(val, (list,)):
                     for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
+                        if isinstance(val[i], torch.Tensor):
+                            val[i] = val[i].cuda(non_blocking=True)
                 else:
                     meta[key] = val.cuda(non_blocking=True)
         test_meter.data_toc()
@@ -143,12 +144,20 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             video_idx = video_idx.cpu()
             feats = feats.cpu() if feats is not None else None
 
+            for key, val in meta.items():
+                if isinstance(val, (list,)):
+                    for i in range(len(val)):
+                        if isinstance(val[i], torch.Tensor):
+                            val[i] = val[i].cpu().detach()
+                else:
+                    meta[key] = val.cpu().detach()
+
         test_meter.iter_toc()
 
         if not cfg.VIS_MASK.ENABLE:
             # Update and log stats.
             test_meter.update_stats(
-                preds.detach(), labels.detach(), video_idx.detach(), feats.detach() if feats is not None else None
+                preds.detach(), labels.detach(), video_idx.detach(), feats.detach() if feats is not None else None, meta
             )
         test_meter.log_iter_stats(cur_iter)
 
