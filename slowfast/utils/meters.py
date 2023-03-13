@@ -261,7 +261,8 @@ class TestMeter(object):
             overall_iters,
             multi_label=False,
             ensemble_method="sum",
-            replace_with=((-1, 0))
+            replace_with=((-1, 0)),
+            do_stats=True
     ):
         """
         Construct tensors to store the predictions and labels. Expect to get
@@ -291,6 +292,7 @@ class TestMeter(object):
         self.video_feats = None
         self.no_stats = no_stats
         self.replace_with = replace_with
+        self.do_stats = do_stats
 
         if multi_label:
             self.video_preds -= 1e10
@@ -374,23 +376,31 @@ class TestMeter(object):
         eta_sec = self.iter_timer.seconds() * (self.overall_iters - cur_iter)
         eta = str(datetime.timedelta(seconds=int(eta_sec)))
 
-        curr_preds, curr_labs = self.video_preds[self.idx_mask], self.video_labels[self.idx_mask]
+        if self.do_stats:
+            curr_preds, curr_labs = self.video_preds[self.idx_mask], self.video_labels[self.idx_mask]
 
-        num_topks_correct = metrics.topks_correct(curr_preds, curr_labs, ks)
+            num_topks_correct = metrics.topks_correct(curr_preds, curr_labs, ks)
 
-        topks = [(x / np.sum(self.idx_mask)) * 100.0 for x in num_topks_correct]
+            topks = [(x / np.sum(self.idx_mask)) * 100.0 for x in num_topks_correct]
 
-        curr_preds_idxs = curr_preds.argmax(dim=1)
-        bal_acc = balanced_accuracy_score(curr_labs, curr_preds_idxs) * 100
+            curr_preds_idxs = curr_preds.argmax(dim=1)
+            bal_acc = balanced_accuracy_score(curr_labs, curr_preds_idxs) * 100
 
-        stats = {
-            "split": "test_iter",
-            "cur_iter": "{}".format(cur_iter + 1),
-            "cur_acc": topks[0].cpu().numpy().item(),
-            "cur_bal_acc": bal_acc,
-            "eta": eta,
-            "time_diff": self.iter_timer.seconds(),
-        }
+            stats = {
+                "split": "test_iter",
+                "cur_iter": "{}".format(cur_iter + 1),
+                "cur_acc": topks[0].cpu().numpy().item(),
+                "cur_bal_acc": bal_acc,
+                "eta": eta,
+                "time_diff": self.iter_timer.seconds(),
+            }
+        else:
+            stats = {
+                "split":       "test_iter",
+                "cur_iter":    "{}".format(cur_iter + 1),
+                "eta":         eta,
+                }
+
         logging.log_json_stats(stats)
 
     def iter_tic(self):
@@ -436,7 +446,7 @@ class TestMeter(object):
             self.stats["map"] = map_str
             self.stats["top1_acc"] = map_str
             self.stats["top5_acc"] = map_str
-        else:
+        elif self.do_stats:
             num_topks_correct = metrics.topks_correct(self.video_preds, self.video_labels, ks)
             topks = [(x / self.video_preds.size(0)) * 100.0 for x in num_topks_correct]
 

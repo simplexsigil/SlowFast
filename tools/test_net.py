@@ -51,9 +51,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
     model.eval()
     test_meter.iter_tic()
 
-    for cur_iter, (inputs, labels, video_idx, time, meta) in enumerate(
-            test_loader
-    ):
+    for cur_iter, (inputs, labels, video_idx, time, meta) in enumerate(test_loader):
         feats = None
 
         if isinstance(labels, list) and len(labels) == 2:
@@ -164,7 +162,7 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
     if cfg.NUM_GPUS:
         all_preds = all_preds.cpu()
         all_labels = all_labels.cpu()
-    if writer is not None:
+    if writer is not None and cfg.DO_STATS:
         writer.plot_eval(preds=all_preds, labels=all_labels)
 
     if cfg.TEST.SAVE_RESULTS_PATH != "":
@@ -259,6 +257,7 @@ def test(cfg):
                 len(test_loader),
                 cfg.DATA.MULTI_LABEL,
                 cfg.DATA.ENSEMBLE_METHOD,
+                do_stats=cfg.DO_STATS
             )
 
         # Set up writer for logging to Tensorboard format.
