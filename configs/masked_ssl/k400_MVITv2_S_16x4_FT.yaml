@@ -9,6 +9,9 @@ TRAIN:
   AUTO_RESUME: True
   MIXED_PRECISION: False
 DATA:
+  PATH_PREFIX: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/kinetics-dataset/k400
+  PATH_TO_DATA_DIR: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/kinetics-dataset/k400/slowfast
+  PATH_LABEL_SEPARATOR: ","
   USE_OFFSET_SAMPLING: True
   DECODING_BACKEND: torchvision
   NUM_FRAMES: 16
