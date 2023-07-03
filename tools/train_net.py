@@ -320,7 +320,8 @@ def eval_epoch(val_loader, model, val_meter, cur_epoch, cfg, train_loader, write
             for key, val in meta.items():
                 if isinstance(val, (list,)):
                     for i in range(len(val)):
-                        val[i] = val[i].cuda(non_blocking=True)
+                        if isinstance(val[i], torch.Tensor):
+                            val[i] = val[i].cuda(non_blocking=True)
                 else:
                     meta[key] = val.cuda(non_blocking=True)
             index = index.cuda()

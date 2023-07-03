@@ -7,6 +7,7 @@ from .charades import Charades  # noqa
 from .imagenet import Imagenet  # noqa
 from .kinetics import Kinetics  # noqa
 from .amarv import Amarv # noqa
+from .cvhci_fall import CVHCIFall # noqa
 from .ssv2 import Ssv2  # noqa
 
 try:
