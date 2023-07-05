@@ -2,7 +2,7 @@ TRAIN:
   # ENABLE: False # default True
   DATASET: CVHCIFall
   BATCH_SIZE: 128
-  EVAL_PERIOD: 10
+  EVAL_PERIOD: 5
   CHECKPOINT_PERIOD: 10
   AUTO_RESUME: True
 X3D:
@@ -13,7 +13,7 @@ X3D:
   DIM_C1: 12
 TEST:
   ENABLE: True
-  DATASET: AMARV
+  DATASET: CVHCIFall
   BATCH_SIZE: 128
   # CHECKPOINT_FILE_PATH: 'x3d_s.pyth' # 73.50% top1 30-view accuracy to download from the model zoo (optional).
   # NUM_SPATIAL_CROPS: 1
