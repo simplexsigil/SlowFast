@@ -33,7 +33,7 @@ from .transform import (
 logger = logging.get_logger(__name__)
 
 import matplotlib.pyplot as plt
-
+import csv
 
 def shash(s, k=-1):
     hasher = hashlib.sha1(s.encode('utf-8'))
@@ -161,7 +161,9 @@ class CVHCIFall(torch.utils.data.Dataset):
             if self.use_chunk_loading:
                 rows = self._get_chunk(f, self.cfg.DATA.LOADER_CHUNK_SIZE)
             else:
-                rows = f.read().splitlines()
+                csv_reader = csv.reader(f, delimiter=self.cfg.DATA.PATH_LABEL_SEPARATOR, quotechar='"')
+
+                rows = [r for r in csv_reader]
 
             if self.cfg.DEBUG:
                 rows = rows[:20]
@@ -221,10 +223,7 @@ class CVHCIFall(torch.utils.data.Dataset):
                     else:
                         self._sequence_path_map[k].extend(vl)
 
-            for clip_idx, path_label in tqdm.tqdm(enumerate(rows)):
-                fetch_info = path_label.split(
-                    self.cfg.DATA.PATH_LABEL_SEPARATOR
-                )
+            for clip_idx, fetch_info in tqdm.tqdm(enumerate(rows)):
 
                 if len(fetch_info) == 1:
                     path, act = fetch_info[0], 0
@@ -233,6 +232,7 @@ class CVHCIFall(torch.utils.data.Dataset):
                         path, act_cats, act_cats_150, act_cats_labels, act, act_label, t_start, t_stop, dur = fetch_info
                     except Exception as e:
                         # raise RuntimeError("Failed to parse {} info {}.".format(path_to_file, fetch_info))
+                        print(fetch_info)
                         raise e
 
                 def add_row(sequence_dir, path, clip_index, act, act_cat, act_cat_150, ac_name, t_start, t_stop, dur):
