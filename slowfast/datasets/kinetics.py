@@ -3,6 +3,7 @@
 
 import os
 import random
+import time
 
 import numpy as np
 import pandas
@@ -64,6 +65,9 @@ class Kinetics(torch.utils.data.Dataset):
             "val",
             "test",
         ], "Split '{}' not supported for Kinetics".format(mode)
+
+        logger.info("Init kinetics.")
+        import time
         self.mode = mode
         self.cfg = cfg
         self.p_convert_gray = self.cfg.DATA.COLOR_RND_GRAYSCALE
@@ -108,6 +112,7 @@ class Kinetics(torch.utils.data.Dataset):
         Construct the video loader.
         """
         path_to_file = os.path.join(os.path.expandvars(self.cfg.DATA.PATH_TO_DATA_DIR), "{}.csv".format(self.mode))
+        logger.info(f"Constructing loader from file {path_to_file}")
         assert pathmgr.exists(os.path.expandvars(path_to_file)), "{} dir not found".format(path_to_file)
 
         self._path_to_videos = []
@@ -117,6 +122,10 @@ class Kinetics(torch.utils.data.Dataset):
         self.chunk_epoch = 0
         self.epoch = 0.0
         self.skip_rows = self.cfg.DATA.SKIP_ROWS
+
+        logger.info("Opening file.")
+
+        time.sleep(2)
 
         with pathmgr.open(path_to_file, "r") as f:
             if self.use_chunk_loading:
@@ -134,6 +143,7 @@ class Kinetics(torch.utils.data.Dataset):
                 elif len(fetch_info) == 1:
                     path, label = fetch_info[0], 0
                 else:
+                    logger.info("Failed to parse.")
                     raise RuntimeError(
                         "Failed to parse video fetch {} info {} retries.".format(
                             path_to_file, fetch_info
@@ -189,6 +199,7 @@ class Kinetics(torch.utils.data.Dataset):
                 decoded, then return the index of the video. If not, return the
                 index of the video replacement that can be decoded.
         """
+        logger.info(f"Trying to decode {self._path_to_videos[index]}")
         short_cycle_idx = None
         # When short cycle is used, input index is a tupple.
         if isinstance(index, tuple):
@@ -273,6 +284,8 @@ class Kinetics(torch.utils.data.Dataset):
             assert self.mode in ["train", "val"]
         # Try to decode and sample a clip from a video. If the video can not be
         # decoded, repeatly find a random video replacement that can be decoded.
+        logger.info(f"Trying to decode {self._path_to_videos[index]}")
+
         for i_try in range(self._num_retries):
             video_container = None
             try:
