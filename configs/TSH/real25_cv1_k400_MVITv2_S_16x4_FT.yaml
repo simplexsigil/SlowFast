@@ -9,8 +9,8 @@ TRAIN:
   AUTO_RESUME: True
   MIXED_PRECISION: False
 DATA:
-  PATH_PREFIX: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/kinetics-dataset/k400
-  PATH_TO_DATA_DIR: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/kinetics-dataset/k400/slowfast
+  PATH_PREFIX: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/ToyotaSmartHome
+  PATH_TO_DATA_DIR: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/ToyotaSmartHome/annotations/synth25/cv1
   PATH_LABEL_SEPARATOR: ","
   USE_OFFSET_SAMPLING: True
   DECODING_BACKEND: torchvision
@@ -50,6 +50,7 @@ MVIT:
   LAYER_SCALE_INIT_VALUE: 0.0
   USE_MEAN_POOLING: True
   HEAD_INIT_SCALE: 0.001
+  SEPARATE_QKV: True
 AUG:
   ENABLE: True
   COLOR_JITTER: 0.4
