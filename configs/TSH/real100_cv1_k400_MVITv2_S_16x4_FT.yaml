@@ -10,7 +10,7 @@ TRAIN:
   MIXED_PRECISION: False
 DATA:
   PATH_PREFIX: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/ToyotaSmartHome
-  PATH_TO_DATA_DIR: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/ToyotaSmartHome/annotations/cv1
+  PATH_TO_DATA_DIR: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/ToyotaSmartHome/annotations/synth100/cv1
   PATH_LABEL_SEPARATOR: ","
   USE_OFFSET_SAMPLING: True
   DECODING_BACKEND: torchvision
