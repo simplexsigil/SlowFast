@@ -4,13 +4,26 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
-            "name": "Python: Current File",
-            "type": "python",
-            "request": "launch",
-            "program": "${file} ",
-            "console": "integratedTerminal",
-            "justMyCode": true
-        }
+      "name": "Run Python Script",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/tools/run_net.py",
+      "args": [
+        "--cfg",
+        "configs/NTURGBD/synth/real100_cvs_k400_MVITv2_L_16x4_FT.yaml",
+        "--opt",
+        "NUM_GPUS",
+        "1",
+        "DATA_LOADER.NUM_WORKERS",
+        "16",
+        "DATA.PATH_CACHE",
+        "False",
+        "TRAIN.BATCH_SIZE",
+        "2"
+      ],
+      "justMyCode": false
+    }
     ]
 }

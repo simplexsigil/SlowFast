@@ -1,5 +1,7 @@
 TASK: ssl_eval
+OUTPUT_DIR: experiments/amarv/mvitv2-s/TSH/cv1/syn/syn100_real100
 TRAIN:
+  CHECKPOINT_FILE_PATH: checkpoints/k400_MVIT_S_MaskFeat_PT_epoch_00300.pyth
   ENABLE: True
   DATASET: kinetics
   BATCH_SIZE: 32
@@ -7,10 +9,10 @@ TRAIN:
   CHECKPOINT_EPOCH_RESET: True
   CHECKPOINT_PERIOD: 5
   AUTO_RESUME: True
-  MIXED_PRECISION: False
+  MIXED_PRECISION: True
 DATA:
   PATH_PREFIX: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/ToyotaSmartHome
-  PATH_TO_DATA_DIR: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/ToyotaSmartHome/annotations/cv1
+  PATH_TO_DATA_DIR: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/ToyotaSmartHome/annotations/synth100_real100/cv1
   PATH_LABEL_SEPARATOR: ","
   USE_OFFSET_SAMPLING: True
   DECODING_BACKEND: torchvision
@@ -85,6 +87,7 @@ SOLVER:
   OPTIMIZING_METHOD: adamw
   COSINE_AFTER_WARMUP: True
 MODEL:
+  FP16_ALLREDUCE: True
   NUM_CLASSES: 19
   ARCH: mvit
   MODEL_NAME: MViT
@@ -99,7 +102,9 @@ TEST:
 DATA_LOADER:
   NUM_WORKERS: 64
   PIN_MEMORY: True
-NUM_GPUS: 8
+NUM_GPUS: 4
 NUM_SHARDS: 1
 RNG_SEED: 0
-OUTPUT_DIR: .
+
+TENSORBOARD:
+  ENABLE: True
