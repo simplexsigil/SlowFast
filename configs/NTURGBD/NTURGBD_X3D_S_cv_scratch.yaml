@@ -1,3 +1,4 @@
+OUTPUT_DIR: experiments/ft_nturgbd_cv_x3ds-scratch
 TRAIN:
   # ENABLE: False # default True
   DATASET: kinetics
@@ -59,7 +60,6 @@ DATA_LOADER:
   PIN_MEMORY: True
 NUM_GPUS: 8
 RNG_SEED: 0
-OUTPUT_DIR: experiments/ft_hmdb_x3d-s_amarv_scratch
 
 TENSORBOARD:
   ENABLE: True

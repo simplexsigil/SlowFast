@@ -199,7 +199,7 @@ class Kinetics(torch.utils.data.Dataset):
                 decoded, then return the index of the video. If not, return the
                 index of the video replacement that can be decoded.
         """
-        logger.info(f"Trying to decode {self._path_to_videos[index]}")
+        # logger.info(f"Trying to decode {self._path_to_videos[index]}")
         short_cycle_idx = None
         # When short cycle is used, input index is a tupple.
         if isinstance(index, tuple):
@@ -284,7 +284,7 @@ class Kinetics(torch.utils.data.Dataset):
             assert self.mode in ["train", "val"]
         # Try to decode and sample a clip from a video. If the video can not be
         # decoded, repeatly find a random video replacement that can be decoded.
-        logger.info(f"Trying to decode {self._path_to_videos[index]}")
+        # logger.info(f"Trying to decode {self._path_to_videos[index]}")
 
         for i_try in range(self._num_retries):
             video_container = None

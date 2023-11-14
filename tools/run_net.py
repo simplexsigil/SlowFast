@@ -2,6 +2,8 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 """Wrapper to train and test a video classification model."""
+import os
+os.environ['KMP_AFFINITY'] = 'noverbose'
 import warnings
 
 warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._functional_video.*")
@@ -38,6 +40,7 @@ def main():
 
         # Perform training.
         if cfg.TRAIN.ENABLE:
+            print("schnitzel")
             launch_job(cfg=cfg, init_method=args.init_method, func=train)
 
         # Perform multi-clip testing.

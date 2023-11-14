@@ -798,7 +798,6 @@ class X3D(nn.Module):
                 dropout_rate=cfg.MODEL.DROPOUT_RATE,
                 act_func=cfg.MODEL.HEAD_ACT,
                 bn_lin5_on=cfg.X3D.BN_LIN5,
-                ret_feats=cfg.MODEL.RET_FEATS,
             )
 
     def forward(self, x, bboxes=None):

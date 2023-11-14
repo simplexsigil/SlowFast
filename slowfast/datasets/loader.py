@@ -35,7 +35,9 @@ def multiple_samples_collate(batch, fold=False):
     time = [item for sublist in time for item in sublist]
 
     if isinstance(labels, typing.List) and isinstance(labels[0], typing.List):
-        labels, label_names = [item for sublist in labels[::2] for item in sublist], [item for sublist in labels[1::2] for item in sublist]
+        labels, label_names = [item for sublist in labels[::2] for item in sublist], [
+            item for sublist in labels[1::2] for item in sublist
+        ]
         inputs, labels, label_names, video_idx, time, extra_data = (
             default_collate(inputs),
             default_collate(labels),
@@ -90,9 +92,9 @@ def detection_collate(batch):
             bboxes = np.concatenate(bboxes, axis=0)
             collated_extra_data[key] = torch.tensor(bboxes).float()
         elif key == "metadata":
-            collated_extra_data[key] = torch.tensor(
-                list(itertools.chain(*data))
-            ).view(-1, 2)
+            collated_extra_data[key] = torch.tensor(list(itertools.chain(*data))).view(
+                -1, 2
+            )
         else:
             collated_extra_data[key] = default_collate(data)
 
@@ -139,11 +141,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
             worker_init_fn=utils.loader_worker_init_fn(dataset),
         )
     else:
-        if (
-            cfg.MULTIGRID.SHORT_CYCLE
-            and split in ["train"]
-            and not is_precise_bn
-        ):
+        if cfg.MULTIGRID.SHORT_CYCLE and split in ["train"] and not is_precise_bn:
             # Create a sampler for multi-process training
             sampler = utils.create_sampler(dataset, shuffle, cfg)
             batch_sampler = ShortCycleBatchSampler(
@@ -177,6 +175,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
                 )
             else:
                 collate_func = None
+
             loader = torch.utils.data.DataLoader(
                 dataset,
                 batch_size=batch_size,
@@ -185,7 +184,7 @@ def construct_loader(cfg, split, is_precise_bn=False):
                 num_workers=cfg.DATA_LOADER.NUM_WORKERS,
                 pin_memory=cfg.DATA_LOADER.PIN_MEMORY,
                 drop_last=drop_last,
-                collate_fn=collate_func,
+                # collate_fn=collate_func,
                 worker_init_fn=utils.loader_worker_init_fn(dataset),
             )
     return loader
@@ -198,10 +197,8 @@ def shuffle_dataset(loader, cur_epoch):
         loader (loader): data loader to perform shuffle.
         cur_epoch (int): number of the current epoch.
     """
-    if (
-        loader._dataset_kind
-        == torch.utils.data.dataloader._DatasetKind.Iterable
-    ):
+
+    if loader._dataset_kind == torch.utils.data.dataloader._DatasetKind.Iterable:
         if hasattr(loader.dataset, "sampler"):
             sampler = loader.dataset.sampler
         else:
@@ -214,10 +211,12 @@ def shuffle_dataset(loader, cur_epoch):
             if isinstance(loader.batch_sampler, ShortCycleBatchSampler)
             else loader.sampler
         )
-    assert isinstance(
-        sampler, (RandomSampler, DistributedSampler)
-    ), "Sampler type '{}' not supported".format(type(sampler))
+    # assert isinstance(
+    #     sampler, (RandomSampler, DistributedSampler)
+    # ), "Sampler type '{}' not supported".format(type(sampler))
+
     # RandomSampler handles shuffling automatically
+
     if isinstance(sampler, DistributedSampler):
         # DistributedSampler shuffles data based on epoch
         sampler.set_epoch(cur_epoch)

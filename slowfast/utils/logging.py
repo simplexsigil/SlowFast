@@ -62,7 +62,7 @@ def setup_logging(output_dir=None):
 
     if du.is_master_proc():
         ch = logging.StreamHandler(stream=sys.stdout)
-        ch.setLevel(logging.DEBUG)
+        ch.setLevel(logging.INFO)
         ch.setFormatter(plain_formatter)
         logger.addHandler(ch)
 

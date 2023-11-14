@@ -8,7 +8,9 @@ from fvcore.common.config import CfgNode
 def add_custom_config(_C):
     # Add your own customized configs.
     _C.DATA.PATH_CACHE = False
-    _C.DATA.ONLOAD_RESIZE = True  # Whether to automatically resize with ffmpeg when using torchvision.
+    _C.DATA.ONLOAD_RESIZE = (
+        True  # Whether to automatically resize with ffmpeg when using torchvision.
+    )
     _C.DATA.AMARV_PERS = "random"
     _C.TRAIN.TBOARD_VIDEO_EPOCH = 0
     _C.DEBUG_ITERS = -1
@@ -19,5 +21,6 @@ def add_custom_config(_C):
     _C.TENSORBOARD.CWPREC.ENABLE = False
 
     _C.MODEL.RET_FEATS = False
-    _C.DO_STATS=True
-    _C.DEBUG=False
+    _C.DO_STATS = True
+    _C.DEBUG = False
+    _C.SOLVER.PRIVACY_EPSILON = None

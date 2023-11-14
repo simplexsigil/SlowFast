@@ -8,6 +8,7 @@ import logging
 import pickle
 import torch
 import torch.distributed as dist
+import os
 
 from pytorchvideo.layers.distributed import (  # noqa
     cat_all_gather,
@@ -20,7 +21,7 @@ from pytorchvideo.layers.distributed import (  # noqa
 
 
 def init_distributed_training(cfg):
-    return _init_distributed_training(cfg.NUM_GPUS, cfg.SHARD_ID)
+    return _init_distributed_training(cfg.NUM_GPUS, os.environ['LOCAL_RANK'])
 
 def all_gather(tensors):
     """

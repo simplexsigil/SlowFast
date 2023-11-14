@@ -7,6 +7,9 @@ import torch
 import re
 import slowfast.utils.lr_policy as lr_policy
 
+from typing import Tuple
+from opacus import PrivacyEngine
+
 
 def construct_optimizer(model, cfg):
     """
@@ -32,7 +35,7 @@ def construct_optimizer(model, cfg):
         no_grad_parameters = []
         skip = {}
 
-        if cfg.NUM_GPUS > 1:
+        if cfg.NUM_GPUS > 1 and not cfg.SOLVER.OPTIMIZING_METHOD == "dpsgd":
             if hasattr(model.module, "no_weight_decay"):
                 skip = model.module.no_weight_decay()
         else:
@@ -107,16 +110,19 @@ def construct_optimizer(model, cfg):
                 len(non_bn_parameters),
                 len(zero_parameters),
                 len(no_grad_parameters),
-            )
+            )  
         )
+        param_count = sum(p.numel() for p in model.parameters())
+        trainable_param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+        print(f"All parameters: {param_count}")
+        print(f"All trainable parameters: {trainable_param_count} ({float(trainable_param_count)/param_count * 100} %)")
     else:
         raise ValueError(
-            "Layer decay should be in (0, 1], but is {}".format(
-                cfg.SOLVER.LAYER_DECAY
-            )
+            "Layer decay should be in (0, 1], but is {}".format(cfg.SOLVER.LAYER_DECAY)
         )
 
-    if cfg.SOLVER.OPTIMIZING_METHOD == "sgd":
+    if "sgd" in cfg.SOLVER.OPTIMIZING_METHOD:
         optimizer = torch.optim.SGD(
             optim_params,
             lr=cfg.SOLVER.BASE_LR,
@@ -125,6 +131,19 @@ def construct_optimizer(model, cfg):
             dampening=cfg.SOLVER.DAMPENING,
             nesterov=cfg.SOLVER.NESTEROV,
         )
+
+        if cfg.SOLVER.OPTIMIZING_METHOD == "dpsgd":
+            second_optimizer = torch.optim.SGD(
+                optim_params,
+                lr=cfg.SOLVER.BASE_LR,
+                momentum=cfg.SOLVER.MOMENTUM,
+                weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+                dampening=cfg.SOLVER.DAMPENING,
+                nesterov=cfg.SOLVER.NESTEROV,
+            )
+
+            optimizer = (optimizer, second_optimizer)
+
     elif cfg.SOLVER.OPTIMIZING_METHOD == "adam":
         optimizer = torch.optim.Adam(
             optim_params,
@@ -153,9 +172,7 @@ def construct_optimizer(model, cfg):
             "Does not support {} optimizer".format(cfg.SOLVER.OPTIMIZING_METHOD)
         )
     if cfg.SOLVER.LARS_ON:
-        optimizer = LARS(
-            optimizer=optimizer, trust_coefficient=0.001, clip=False
-        )
+        optimizer = LARS(optimizer=optimizer, trust_coefficient=0.001, clip=False)
     return optimizer
 
 
@@ -241,9 +258,7 @@ def get_param_groups(model, cfg):
     # Check all parameters will be passed into optimizer.
     assert (
         len(list(model.parameters()))
-        == non_bn_parameters_count
-        + zero_parameters_count
-        + no_grad_parameters_count
+        == non_bn_parameters_count + zero_parameters_count + no_grad_parameters_count
     ), "parameter size does not match: {} + {} + {} != {}".format(
         non_bn_parameters_count,
         zero_parameters_count,
@@ -279,8 +294,13 @@ def set_lr(optimizer, new_lr):
         optimizer (optim): the optimizer using to optimize the current network.
         new_lr (float): the new learning rate to set.
     """
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = new_lr * (param_group["layer_decay"] if "layer_decay" in param_group else 1.)
+    optimizers = [optimizer] if not isinstance(optimizer, tuple) else optimizer
+
+    for optim in optimizers:
+        for param_group in optim.param_groups:
+            param_group["lr"] = new_lr * (
+                param_group["layer_decay"] if "layer_decay" in param_group else 1.0
+            )
 
 
 class LARS(object):
@@ -347,13 +367,9 @@ class LARS(object):
             weight_decays = []
             for group in self.optim.param_groups:
                 # absorb weight decay control from optimizer
-                weight_decay = (
-                    group["weight_decay"] if "weight_decay" in group else 0
-                )
+                weight_decay = group["weight_decay"] if "weight_decay" in group else 0
                 weight_decays.append(weight_decay)
-                apply_LARS = (
-                    group["apply_LARS"] if "apply_LARS" in group else True
-                )
+                apply_LARS = group["apply_LARS"] if "apply_LARS" in group else True
                 if not apply_LARS:
                     continue
                 group["weight_decay"] = 0
@@ -396,16 +412,11 @@ def get_grad_norm_(parameters, norm_type=2.0):
         return torch.tensor(0.0)
     device = parameters[0].grad.device
     if norm_type == "inf":
-        total_norm = max(
-            p.grad.detach().abs().max().to(device) for p in parameters
-        )
+        total_norm = max(p.grad.detach().abs().max().to(device) for p in parameters)
     else:
         total_norm = torch.norm(
             torch.stack(
-                [
-                    torch.norm(p.grad.detach(), norm_type).to(device)
-                    for p in parameters
-                ]
+                [torch.norm(p.grad.detach(), norm_type).to(device) for p in parameters]
             ),
             norm_type,
         )

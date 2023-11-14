@@ -1,4 +1,5 @@
 TRAIN:
+  CHECKPOINT_FILE_PATH: "checkpoints/MViTv2_S_16x4_k400_f302660347.pyth"
   ENABLE: True
   DATASET: kinetics
   BATCH_SIZE: 64
@@ -14,8 +15,9 @@ DATA:
   TRAIN_CROP_SIZE: 224
   TEST_CROP_SIZE: 224
   INPUT_CHANNEL_NUM: [3]
-  PATH_PREFIX: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/kinetics-dataset/k400
-  PATH_TO_DATA_DIR: /pfs/work8/workspace/ffuc/scratch/kf3609-ws/datasets/kinetics-dataset/k400/slowfast
+  PATH_TO_DATA_DIR: "splits/NTU_RGBD/cross-subject"
+  PATH_PREFIX: "/pfs/work8/workspace/ffhk/scratch/kf3609-datasets/datasets/NTU_RGBD/rgb_60"
+  PATH_LABEL_SEPARATOR: ","
   TRAIN_JITTER_SCALES_RELATIVE: [0.08, 1.0]
   TRAIN_JITTER_ASPECT_RELATIVE: [0.75, 1.3333]
 MVIT:
@@ -31,7 +33,7 @@ MVIT:
   PATCH_PADDING: (1, 3, 3)
   MLP_RATIO: 4.0
   QKV_BIAS: True
-  DROPPATH_RATE: 0.2
+  DROPPATH_RATE: 0.0
   NORM: "layernorm"
   MODE: "conv"
   CLS_EMBED_ON: True
@@ -44,7 +46,7 @@ MVIT:
   DIM_MUL_IN_ATT: True
   RESIDUAL_POOLING: True
 AUG:
-  NUM_SAMPLE: 2
+  NUM_SAMPLE: 1
   ENABLE: True
   COLOR_JITTER: 0.4
   AA_TYPE: rand-m7-n4-mstd0.5-inc1
@@ -54,7 +56,7 @@ AUG:
   RE_COUNT: 1
   RE_SPLIT: False
 MIXUP:
-  ENABLE: True
+  ENABLE: False
   ALPHA: 0.8
   CUTMIX_ALPHA: 1.0
   PROB: 1.0
@@ -64,13 +66,13 @@ SOLVER:
   ZERO_WD_1D_PARAM: True
   BASE_LR_SCALE_NUM_SHARDS: True
   CLIP_GRAD_L2NORM: 1.0
-  BASE_LR: 0.0001
+  BASE_LR: 0.001
   COSINE_AFTER_WARMUP: True
   COSINE_END_LR: 1e-6
-  WARMUP_START_LR: 1e-6
-  WARMUP_EPOCHS: 30.0
+  WARMUP_START_LR: 1e-4
+  WARMUP_EPOCHS: 3.0
   LR_POLICY: cosine
-  MAX_EPOCH: 200
+  MAX_EPOCH: 100
   MOMENTUM: 0.9
   WEIGHT_DECAY: 0.05
   OPTIMIZING_METHOD: adamw

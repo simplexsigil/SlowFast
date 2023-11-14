@@ -6,6 +6,8 @@ TRAIN:
   CHECKPOINT_PERIOD: 10
   AUTO_RESUME: True
 DATA:
+  PATH_TO_DATA_DIR: "splits/NTU_RGBD/cross-subject"
+  PATH_PREFIX: "/pfs/work8/workspace/ffhk/scratch/kf3609-datasets/datasets/NTU_RGBD/rgb_60"
   USE_OFFSET_SAMPLING: True
   DECODING_BACKEND: torchvision
   NUM_FRAMES: 16
@@ -68,7 +70,7 @@ SOLVER:
   WARMUP_START_LR: 1e-6
   WARMUP_EPOCHS: 30.0
   LR_POLICY: cosine
-  MAX_EPOCH: 200
+  MAX_EPOCH: 100
   MOMENTUM: 0.9
   WEIGHT_DECAY: 0.05
   OPTIMIZING_METHOD: adamw
