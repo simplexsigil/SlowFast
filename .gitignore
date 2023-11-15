@@ -13,3 +13,4 @@ old_checkpoints
 *.egg-info
 **/*.pyc
 dist
+logs
