@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+import sys
+
+def update_yaml(file_path, key_path, new_value):
+    key_hierarchy = key_path.split('.')
+    key_to_replace = key_hierarchy[-1]
+    indent_level = len(key_hierarchy) - 1
+    found = False
+    added = False
+
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    new_lines = []
+    current_hierarchy = []
+    for line in lines:
+        current_indent = (len(line) - len(line.lstrip())) // 2
+        if ':' in line and not line.lstrip().startswith('#'):
+            current_key = line.lstrip().split(':')[0]
+            while current_hierarchy and current_indent <= current_hierarchy[-1][1]:
+                current_hierarchy.pop()
+            current_hierarchy.append((current_key, current_indent))
+
+        if current_hierarchy[:-1] == [(k, i) for i, k in enumerate(key_hierarchy[:-1])]:
+            if current_key == key_to_replace:
+                line = '  ' * current_indent + f"{key_to_replace}: {new_value}\n"
+                found = True
+
+        new_lines.append(line)
+
+        # Check if next line is deeper in hierarchy, if not - add the new key
+        if not found and current_hierarchy[:-1] == [(k, i) for i, k in enumerate(key_hierarchy[:-1])]:
+            next_line_indent = ((len(lines[lines.index(line) + 1]) - len(lines[lines.index(line) + 1].lstrip())) // 2) if lines.index(line) + 1 < len(lines) else 0
+            if current_indent < next_line_indent or (current_indent >= next_line_indent and lines.index(line) == len(lines) - 1):
+                new_lines.append('  ' * (current_indent + 1) + f"{key_to_replace}: {new_value}\n")
+                added = True
+                found = True  # to prevent adding it again
+
+    with open(file_path, 'w') as file:
+        file.writelines(new_lines)
+
+    return found, added
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        print("Usage: ./modify_yaml.py <filename> <key> <new_value>")
+        sys.exit(1)
+
+    filename, key, new_value = sys.argv[1], sys.argv[2], sys.argv[3]
+    found, added = update_yaml(filename, key, new_value)
+    if not found and added:
+        print(f"Key '{key}' added.")
+    elif found:
+        print(f"Key '{key}' updated.")
+    else:
+        print(f"Key '{key}' not found and could not be added.")
+
