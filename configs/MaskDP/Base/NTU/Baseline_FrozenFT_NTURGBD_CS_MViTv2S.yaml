@@ -10,8 +10,7 @@ TRAIN:
   CHECKPOINT_PERIOD: 10
   AUTO_RESUME: True
   MIXED_PRECISION: False
-  UNFREEZE_PAT: "(?:module.)?blocks.(?:|14|15).*norm.*|(?:module.)?norm.weight|(?:module.)?norm.bias|.*head.projection.*"
-  # (?:module.)?blocks.15.attn.rel_pos_(?:h|w).*|
+  UNFREEZE_PAT: "(?:module.)?blocks.(?:|14|15).(?:attn.)?norm.*|(?:module.)?norm.weight|(?:module.)?norm.bias|.*head.projection.*"
 DATA:
   PATH_TO_DATA_DIR: "splits/NTU_RGBD/cross-subject"
   PATH_PREFIX: "/pfs/work8/workspace/ffhk/scratch/kf3609-datasets/datasets/NTU_RGBD/rgb_60"
