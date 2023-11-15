@@ -25,7 +25,6 @@ import os
 # print(f"CPU Count: {os.cpu_count()}")
 torch.set_num_threads(os.cpu_count())
 
-
 # print(f"Num threads: {torch.get_num_threads()}")
 
 def main():

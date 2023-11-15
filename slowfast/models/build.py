@@ -72,9 +72,10 @@ def build_model(cfg, gpu_id=None):
                 device_ids=[cur_device],
                 output_device=cur_device,
                 find_unused_parameters=True
-                if cfg.MODEL.DETACH_FINAL_FC
-                or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
-                else False,
+                #if cfg.MODEL.DETACH_FINAL_FC
+                #or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+                #else False,
+                # TODO
             )
         else:
             model: DPDDP = DPDDP(model)

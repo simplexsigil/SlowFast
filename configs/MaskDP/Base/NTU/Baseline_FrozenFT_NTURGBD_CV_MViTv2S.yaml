@@ -1,18 +1,18 @@
-TASK: ssl_eval
-OUTPUT_DIR: experiments/ft_nturgbd_real_cs_mvitv2s
+TASK: base_ft
+OUTPUT_DIR: experiments/MaskDP/baseline/nturgbd/mvitv2s/cross-view
 TRAIN:
   CHECKPOINT_FILE_PATH: experiments/amarv/mvitv2-s/all_mask_feat_pt_correct/checkpoints/ssl_checkpoint_epoch_00233.pyth
   ENABLE: True
   DATASET: kinetics
-  BATCH_SIZE: 96
+  BATCH_SIZE: 64
   EVAL_PERIOD: 10
   CHECKPOINT_EPOCH_RESET: True
   CHECKPOINT_PERIOD: 10
   AUTO_RESUME: True
   MIXED_PRECISION: False
-  UNFREEZE_PAT: ''  # Only fine tuning
+  UNFREEZE_PAT: "(?:module.)?blocks.15.*|(?:module.)?norm.weight|(?:module.)?norm.bias|.*head.projection.*"
 DATA:
-  PATH_TO_DATA_DIR: "splits/NTU_RGBD/cross-subject"
+  PATH_TO_DATA_DIR: "splits/NTU_RGBD/cross-view"
   PATH_PREFIX: "/pfs/work8/workspace/ffhk/scratch/kf3609-datasets/datasets/NTU_RGBD/rgb_60"
   PATH_LABEL_SEPARATOR: ","
   USE_OFFSET_SAMPLING: True
@@ -49,7 +49,7 @@ MVIT:
   REL_POS_TEMPORAL: True # default: false
   RESIDUAL_POOLING: True
   MODE: "conv"
-  DROPPATH_RATE: 0.1
+  DROPPATH_RATE: 0.2
   LAYER_SCALE_INIT_VALUE: 0.0
   USE_MEAN_POOLING: True
   HEAD_INIT_SCALE: 0.001
@@ -73,27 +73,26 @@ MIXUP:
   LABEL_SMOOTH_VALUE: 0.1
 SOLVER:
   ZERO_WD_1D_PARAM: True
-  CLIP_GRAD_L2NORM: 5.0
-  LAYER_DECAY: 0.75                # !
+  CLIP_GRAD_L2NORM: 100  # 5.0
+  LAYER_DECAY: 1.0               # !
   BASE_LR_SCALE_NUM_SHARDS: True
   BASE_LR: 0.001                  # !
-  COSINE_AFTER_WARMUP: True
-  COSINE_END_LR: 1e-5
-  WARMUP_START_LR: 1e-6
+  WARMUP_START_LR: 1e-5
   WARMUP_EPOCHS: 10.0
-  LR_POLICY: cosine
-  MAX_EPOCH: 100
-  MOMENTUM: 0.9
-  WEIGHT_DECAY: 0.05
-  OPTIMIZING_METHOD: dpsgd
   COSINE_AFTER_WARMUP: True
-  PRIVACY_EPSILON: 1.0
+  LR_POLICY: cosine
+  COSINE_END_LR: 1e-5
+  MAX_EPOCH: 150
+  MOMENTUM: 0.9
+  WEIGHT_DECAY: 0.00
+  OPTIMIZING_METHOD: sgd
+  PRIVACY_EPSILON: 10.0  # Only affects dpsgd
 MODEL:
   NUM_CLASSES: 60
   ARCH: mvit
   MODEL_NAME: MViT
   LOSS_FUNC: soft_cross_entropy
-  DROPOUT_RATE: 0.0
+  DROPOUT_RATE: 0.2
   FP16_ALLREDUCE: False
   RET_FEATS: False
 TEST:
@@ -103,7 +102,7 @@ TEST:
   NUM_SPATIAL_CROPS: 1
   NUM_TEMPORAL_CLIPS: [1, 3, 4, 5, 7, 10]
 DATA_LOADER:
-  NUM_WORKERS: 16
+  NUM_WORKERS: 32
   PIN_MEMORY: True
 NUM_GPUS: 4
 NUM_SHARDS: 1
