@@ -1,5 +1,5 @@
 TASK: base_ft
-OUTPUT_DIR: experiments/MaskDP/baseline/nturgbd/mvitv2s/cross-subject
+OUTPUT_DIR: experiments/MaskDP/anon/nturgbd/mvitv2s/cross-subject
 TRAIN:
   CHECKPOINT_FILE_PATH: experiments/amarv/mvitv2-s/all_mask_feat_pt_correct/checkpoints/ssl_checkpoint_epoch_00233.pyth
   ENABLE: True
@@ -12,7 +12,7 @@ TRAIN:
   MIXED_PRECISION: False
   UNFREEZE_PAT: "(?:module.)?blocks.(?:14|15).*norm.*|(?:module.)?norm.weight|(?:module.)?norm.bias|.*head.projection.*"
 DATA:
-  PATH_TO_DATA_DIR: "splits/NTU_RGBD/cross-subject"
+  PATH_TO_DATA_DIR: "splits/ToyotaSmarthome/cross-subject"
   PATH_PREFIX: "/pfs/work8/workspace/ffhk/scratch/kf3609-datasets/datasets/NTU_RGBD/ntu_synth/rgb_60_comb"
   PATH_LABEL_SEPARATOR: ","
   USE_OFFSET_SAMPLING: True
@@ -50,7 +50,7 @@ MVIT:
   REL_POS_TEMPORAL: True # default: false
   RESIDUAL_POOLING: True
   MODE: "conv"
-  DROPPATH_RATE: 0.2
+  DROPPATH_RATE: 0.1
   LAYER_SCALE_INIT_VALUE: 0.0
   USE_MEAN_POOLING: True
   HEAD_INIT_SCALE: 0.001
@@ -92,7 +92,7 @@ MODEL:
   NUM_CLASSES: 60
   ARCH: mvit
   MODEL_NAME: MViT
-  LOSS_FUNC: soft_cross_entropy
+  LOSS_FUNC: cross_entropy
   DROPOUT_RATE: 0.2
   FP16_ALLREDUCE: False
   RET_FEATS: False

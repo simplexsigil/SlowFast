@@ -13,7 +13,7 @@ TRAIN:
   UNFREEZE_PAT: "(?:module.)?blocks.15.*|(?:module.)?norm.weight|(?:module.)?norm.bias|.*head.projection.*"
 DATA:
   PATH_TO_DATA_DIR: "splits/ToyotaSmarthome/cross-subject"
-  PATH_PREFIX: "/pfs/work8/workspace/ffhk/scratch/kf3609-datasets/datasets/ToyotaSmartHome/mp4_rend"
+  PATH_PREFIX: "/lsdf/kit/anthropomatik/projects/cvhci/data/activity/ToyotaSmartHome/mp4"
   PATH_LABEL_SEPARATOR: ","
   USE_OFFSET_SAMPLING: True
   DECODING_BACKEND: torchvision
