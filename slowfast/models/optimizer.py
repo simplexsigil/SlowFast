@@ -110,20 +110,26 @@ def construct_optimizer(model, cfg):
                 len(non_bn_parameters),
                 len(zero_parameters),
                 len(no_grad_parameters),
-            )  
+            )
         )
         param_count = sum(p.numel() for p in model.parameters())
-        trainable_param_count = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        trainable_param_count = sum(
+            p.numel() for p in model.parameters() if p.requires_grad
+        )
 
         print(f"All parameters: {param_count}")
-        print(f"All trainable parameters: {trainable_param_count} ({float(trainable_param_count)/param_count * 100} %)")
+        print(
+            f"All trainable parameters: {trainable_param_count} ({float(trainable_param_count)/param_count * 100} %)"
+        )
     else:
         raise ValueError(
             "Layer decay should be in (0, 1], but is {}".format(cfg.SOLVER.LAYER_DECAY)
         )
 
     if "sgd" in cfg.SOLVER.OPTIMIZING_METHOD:
-        optimizer = torch.optim.SGD(
+        optimizer = {}
+
+        optimizer_sgd = torch.optim.SGD(
             optim_params,
             lr=cfg.SOLVER.BASE_LR,
             momentum=cfg.SOLVER.MOMENTUM,
@@ -132,17 +138,23 @@ def construct_optimizer(model, cfg):
             nesterov=cfg.SOLVER.NESTEROV,
         )
 
-        if cfg.SOLVER.OPTIMIZING_METHOD == "dpsgd":
-            second_optimizer = torch.optim.SGD(
-                optim_params,
-                lr=cfg.SOLVER.BASE_LR,
-                momentum=cfg.SOLVER.MOMENTUM,
-                weight_decay=cfg.SOLVER.WEIGHT_DECAY,
-                dampening=cfg.SOLVER.DAMPENING,
-                nesterov=cfg.SOLVER.NESTEROV,
-            )
+        if not cfg.SOLVER.OPTIMIZING_METHOD == "dpsgd":
+            optimizer["opt"] = optimizer_sgd  # Default, not DP
+        else:
+            optimizer["dp"] = optimizer_sgd
 
-            optimizer = (optimizer, second_optimizer)
+            if cfg.SOLVER.MASK_DP:  # Basic DP Optimizer, to be converted later
+                # MaskDP has a DP and a non-dp (maskdp) optimizer.
+                mask_dp_opt = torch.optim.SGD(
+                    optim_params,
+                    lr=cfg.SOLVER.BASE_LR,
+                    momentum=cfg.SOLVER.MOMENTUM,
+                    weight_decay=cfg.SOLVER.WEIGHT_DECAY,
+                    dampening=cfg.SOLVER.DAMPENING,
+                    nesterov=cfg.SOLVER.NESTEROV,
+                )
+
+                optimizer["maskdp"] = mask_dp_opt
 
     elif cfg.SOLVER.OPTIMIZING_METHOD == "adam":
         optimizer = torch.optim.Adam(
@@ -287,16 +299,14 @@ def get_epoch_lr(cur_epoch, cfg):
     return lr_policy.get_lr_at_epoch(cfg, cur_epoch)
 
 
-def set_lr(optimizer, new_lr):
+def set_lr(optimizers, new_lr):
     """
     Sets the optimizer lr to the specified value.
     Args:
         optimizer (optim): the optimizer using to optimize the current network.
         new_lr (float): the new learning rate to set.
     """
-    optimizers = [optimizer] if not isinstance(optimizer, tuple) else optimizer
-
-    for optim in optimizers:
+    for optim in optimizers.values():
         for param_group in optim.param_groups:
             param_group["lr"] = new_lr * (
                 param_group["layer_decay"] if "layer_decay" in param_group else 1.0

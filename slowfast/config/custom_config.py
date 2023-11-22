@@ -24,3 +24,7 @@ def add_custom_config(_C):
     _C.DO_STATS = True
     _C.DEBUG = False
     _C.SOLVER.PRIVACY_EPSILON = None
+    _C.SOLVER.MASK_DP = False
+    _C.DATA.MASK_PREFIX = None
+    _C.DATA.MASK_H = None
+    _C.DATA.MASK_W = None

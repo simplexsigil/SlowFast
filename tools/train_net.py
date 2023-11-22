@@ -46,6 +46,7 @@ from slowfast.utils.meters import AVAMeter, EpochTimer, TrainMeter, ValMeter
 from slowfast.utils.multigrid import MultigridSchedule
 import slowfast.datasets.utils as utils
 import os
+from einops import repeat as rep
 
 logger = logging.get_logger(__name__)
 
@@ -87,7 +88,7 @@ def train_epoch(
     train_meter.iter_tic()
     data_size = len(train_loader)
 
-    optimizers = (optimizer,) if not isinstance(optimizer, tuple) else optimizer
+    optimizers = {"opt": optimizer} if not isinstance(optimizer, dict) else optimizer
 
     if cfg.MIXUP.ENABLE:
         mixup_fn = MixUp(
@@ -138,9 +139,7 @@ def train_epoch(
                         meta[key] = val.cuda(non_blocking=True)
 
         batch_size = (
-            inputs[0][0].size(0)
-            if isinstance(inputs[0], list)
-            else inputs[0].size(0)
+            inputs[0][0].size(0) if isinstance(inputs[0], list) else inputs[0].size(0)
         )
         # Update the learning rate.
         epoch_exact = cur_epoch + float(cur_iter) / data_size
@@ -170,17 +169,14 @@ def train_epoch(
                     if cfg.MIXUP.ENABLE
                     else label_names[i]
                 )
-                writer.add_video(
-                    vid_ins[i : i + 1], f"Train/videos/{ln}", cur_epoch
-                )
+                writer.add_video(vid_ins[i : i + 1], f"Train/videos/{ln}", cur_epoch)
 
         with torch.cuda.amp.autocast(enabled=cfg.TRAIN.MIXED_PRECISION):
             # Explicitly declare reduction to mean.
             perform_backward = True
-
-            for opt in optimizers:
-                opt: torch.optim.Optimizer
-                opt.zero_grad(set_to_none=True)
+            optimizers[
+                "opt" if not cfg.SOLVER.OPTIMIZING_METHOD == "dpsgd" else "dp"
+            ].zero_grad(set_to_none=True)
 
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel":
                 (
@@ -202,7 +198,6 @@ def train_epoch(
                 labels = torch.zeros(
                     preds.size(0), dtype=labels.dtype, device=labels.device
                 )
-
             if cfg.MODEL.MODEL_NAME == "ContrastiveModel" and partial_loss:
                 loss = partial_loss
             else:
@@ -218,8 +213,9 @@ def train_epoch(
         if perform_backward:
             scaler.scale(loss).backward()
         # Unscales the gradients of optimizer's assigned params in-place
-        for opt in optimizers:
-            scaler.unscale_(opt)
+        scaler.unscale_(
+            optimizers["opt" if not cfg.SOLVER.OPTIMIZING_METHOD == "dpsgd" else "dp"]
+        )
         # Clip gradients if necessary
         if cfg.SOLVER.CLIP_GRAD_VAL:
             grad_norm = torch.nn.utils.clip_grad_value_(
@@ -236,9 +232,37 @@ def train_epoch(
             model, cfg, epoch_exact, cur_iter
         )
         if update_param:
-            for opt in optimizers:
-                scaler.step(opt)
+            scaler.step(
+                optimizers[
+                    "opt" if not cfg.SOLVER.OPTIMIZING_METHOD == "dpsgd" else "dp"
+                ]
+            )
         scaler.update()
+
+        if cfg.SOLVER.MASK_DP:
+            # We now run the model a second time, this time with the masked image and blacking out background tokens.
+            optimizers["dp"].zero_grad(
+                set_to_none=True
+            )  # Making sure we do not need double the memory
+            test_img = inputs[0][0].permute(1, 2, 3, 0)[0].cpu().numpy()
+            test_mask = meta["dp_masks"][0, 0, 0]
+            masks = meta["dp_masks"]
+            masks = rep(masks, "b 1 t h w -> b 3 t h w")
+            inputs[0][masks == 0] = torch.nan  # This is a trick:
+            # Its a secure way to make sure all token embeddings based on these areas are None.
+            # The model filters these tokens after the patch embedding and zeros them out.
+            preds_mdp = model(inputs[0])
+
+            # Compute the loss.
+            loss = loss_fun(preds_mdp, labels)
+
+            loss.backward()
+
+            optimizers["maskdp"].step()
+
+            optimizers["maskdp"].zero_grad(set_to_none=True)
+
+            preds = (preds + preds_mdp) / 2.0
 
         if cfg.MIXUP.ENABLE:
             _top_max_k_vals, top_max_k_inds = torch.topk(
@@ -626,7 +650,7 @@ def train(cfg):
         flops, params = misc.log_model_info(model, cfg, use_train_input=True)
 
     # Construct the optimizer.
-    optimizer = optim.construct_optimizer(model, cfg)
+    optimizers = optim.construct_optimizer(model, cfg)
     # Create a GradScaler for mixed precision training
     scaler = torch.cuda.amp.GradScaler(enabled=cfg.TRAIN.MIXED_PRECISION)
 
@@ -639,7 +663,7 @@ def train(cfg):
                 last_checkpoint,
                 model,
                 cfg.NUM_GPUS > 1,
-                optimizer,
+                optimizers,
                 scaler if cfg.TRAIN.MIXED_PRECISION else None,
             )
             start_epoch = checkpoint_epoch + 1
@@ -649,7 +673,7 @@ def train(cfg):
                 last_checkpoint,
                 model,
                 cfg.NUM_GPUS > 1,
-                optimizer,
+                optimizers,
                 scaler if cfg.TRAIN.MIXED_PRECISION else None,
                 epoch_reset=True,
                 clear_name_pattern=cfg.TRAIN.CHECKPOINT_CLEAR_NAME_PATTERN,
@@ -663,7 +687,7 @@ def train(cfg):
             cfg.TRAIN.CHECKPOINT_FILE_PATH,
             model,
             cfg.NUM_GPUS > 1,
-            optimizer,
+            optimizers,
             scaler if cfg.TRAIN.MIXED_PRECISION else None,
             inflation=cfg.TRAIN.CHECKPOINT_INFLATE,
             convert_from_caffe2=cfg.TRAIN.CHECKPOINT_TYPE == "caffe2",
@@ -712,26 +736,23 @@ def train(cfg):
     logger.info("Start epoch: {}".format(start_epoch + 1))
 
     if cfg.SOLVER.OPTIMIZING_METHOD == "dpsgd":
-        optimizer, second_optimizer = optimizer
-
         privacy_engine = PrivacyEngine()
         (
             model,
-            second_optimizer,
+            optimizers["dp"],
             train_loader,
         ) = privacy_engine.make_private_with_epsilon(
             module=model,
-            optimizer=second_optimizer,
+            optimizer=optimizers["dp"],
             data_loader=train_loader,
             target_epsilon=cfg.SOLVER.PRIVACY_EPSILON,
+            epsilon_tolerance=0.1,
             target_delta=1e-5,
             max_grad_norm=1,
             poisson_sampling=False,
             epochs=cfg.SOLVER.MAX_EPOCH,
             grad_sample_mode="hooks",
         )
-
-        optimizer = second_optimizer  # (optimizer, second_optimizer)
 
     epoch_timer = EpochTimer()
     for cur_epoch in range(start_epoch, cfg.SOLVER.MAX_EPOCH):
@@ -753,7 +774,7 @@ def train(cfg):
             if changed:
                 (
                     model,
-                    optimizer,
+                    optimizers,
                     train_loader,
                     val_loader,
                     precise_bn_loader,
@@ -770,7 +791,7 @@ def train(cfg):
                 else:
                     last_checkpoint = cfg.TRAIN.CHECKPOINT_FILE_PATH
                 logger.info("Load from {}".format(last_checkpoint))
-                cu.load_checkpoint(last_checkpoint, model, cfg.NUM_GPUS > 1, optimizer)
+                cu.load_checkpoint(last_checkpoint, model, cfg.NUM_GPUS > 1, optimizers)
 
         # Shuffle the dataset.
         loader.shuffle_dataset(train_loader, cur_epoch)
@@ -781,7 +802,7 @@ def train(cfg):
         train_epoch(
             train_loader,
             model,
-            optimizer,
+            optimizers,
             scaler,
             train_meter,
             cur_epoch,
@@ -851,7 +872,7 @@ def train(cfg):
             cu.save_checkpoint(
                 cfg.OUTPUT_DIR,
                 model,
-                optimizer,
+                optimizers,
                 cur_epoch,
                 cfg,
                 scaler if cfg.TRAIN.MIXED_PRECISION else None,

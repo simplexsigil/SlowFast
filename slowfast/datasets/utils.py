@@ -265,9 +265,7 @@ def load_image_lists(frame_list_file, prefix="", return_list=False):
             image_paths[video_name].append(path)
             frame_labels = row[-1].replace('"', "")
             if frame_labels != "":
-                labels[video_name].append(
-                    [int(x) for x in frame_labels.split(",")]
-                )
+                labels[video_name].append([int(x) for x in frame_labels.split(",")])
             else:
                 labels[video_name].append([])
 
@@ -420,9 +418,7 @@ def aug_frame(
         inverse_uniform_sampling=cfg.DATA.INV_UNIFORM_SAMPLE,
         aspect_ratio=relative_aspect,
         scale=relative_scales,
-        motion_shift=cfg.DATA.TRAIN_JITTER_MOTION_SHIFT
-        if mode in ["train"]
-        else False,
+        motion_shift=cfg.DATA.TRAIN_JITTER_MOTION_SHIFT if mode in ["train"] else False,
     )
 
     if rand_erase:
@@ -441,9 +437,7 @@ def aug_frame(
 
 
 def _frame_to_list_img(frames):
-    img_list = [
-        transforms.ToPILImage()(frames[i]) for i in range(frames.size(0))
-    ]
+    img_list = [transforms.ToPILImage()(frames[i]) for i in range(frames.size(0))]
     return img_list
 
 

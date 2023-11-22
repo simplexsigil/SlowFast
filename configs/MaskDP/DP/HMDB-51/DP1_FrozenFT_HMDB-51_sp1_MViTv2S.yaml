@@ -1,5 +1,5 @@
 TASK: dp_ft
-OUTPUT_DIR: experiments/MaskDP/dp/hmdb51/mvitv2s/sp1
+OUTPUT_DIR: experiments/MaskDP/dp/hmdb51/mvitv2s/sp1/dp1
 TRAIN:
   CHECKPOINT_FILE_PATH: ext_checkpoints/MViTv2_S_16x4_k400_f302660347.pyth
   ENABLE: True
@@ -8,7 +8,7 @@ TRAIN:
   EVAL_PERIOD: 10
   CHECKPOINT_EPOCH_RESET: True
   CHECKPOINT_PERIOD: 10
-  AUTO_RESUME: False
+  AUTO_RESUME: True
   MIXED_PRECISION: False
   UNFREEZE_PAT: "(?:module.)?blocks.(?:|14|15).(?:attn.)?norm.*|(?:module.)?norm.weight|(?:module.)?norm.bias|.*head.projection.*"
 DATA:
@@ -74,10 +74,10 @@ SOLVER:
   CLIP_GRAD_L2NORM: 100  # 5.0
   LAYER_DECAY: 1.0               # !
   BASE_LR_SCALE_NUM_SHARDS: True
-  BASE_LR: 0.001                  # !
+  BASE_LR: 0.01                  # !
   COSINE_END_LR: 1e-5
   WARMUP_START_LR: 1e-5
-  WARMUP_EPOCHS: 10.0
+  WARMUP_EPOCHS: 20.0
   LR_POLICY: cosine
   MAX_EPOCH: 150
   MOMENTUM: 0.9

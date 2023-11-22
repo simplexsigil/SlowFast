@@ -1,17 +1,28 @@
 #!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
+import torch
+import os
+
+os.system("taskset -p 0xffffffffffffffffffffffffffffffffffffff %d" % os.getpid())
+torch.set_num_threads(os.cpu_count())
+os.system("taskset -p 0xffffffffffffffffffffffffffffffffffffff %d" % os.getpid())
+
 """Multi-view test a video classification model."""
 import warnings
 
-warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._functional_video.*")
-warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\._transforms_video.*")
-warnings.filterwarnings("ignore", message=r".*torchvision\.transforms\.functional_tensor.*")
+warnings.filterwarnings(
+    "ignore", message=r".*torchvision\.transforms\._functional_video.*"
+)
+warnings.filterwarnings(
+    "ignore", message=r".*torchvision\.transforms\._transforms_video.*"
+)
+warnings.filterwarnings(
+    "ignore", message=r".*torchvision\.transforms\.functional_tensor.*"
+)
 
 import numpy as np
-import os
 import pickle
-import torch
 
 import slowfast.utils.checkpoint as cu
 import slowfast.utils.distributed as du
@@ -85,12 +96,8 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             metadata = meta["metadata"]
 
             preds = preds.detach().cpu() if cfg.NUM_GPUS else preds.detach()
-            ori_boxes = (
-                ori_boxes.detach().cpu() if cfg.NUM_GPUS else ori_boxes.detach()
-            )
-            metadata = (
-                metadata.detach().cpu() if cfg.NUM_GPUS else metadata.detach()
-            )
+            ori_boxes = ori_boxes.detach().cpu() if cfg.NUM_GPUS else ori_boxes.detach()
+            metadata = metadata.detach().cpu() if cfg.NUM_GPUS else metadata.detach()
 
             if cfg.NUM_GPUS > 1:
                 preds = torch.cat(du.all_gather_unaligned(preds), dim=0)
@@ -135,7 +142,9 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
         # Gather all the predictions across all the devices to perform ensemble.
         if cfg.NUM_GPUS > 1:
             if feats is not None:
-                preds, labels, video_idx, feats = du.all_gather([preds, labels, video_idx, feats])
+                preds, labels, video_idx, feats = du.all_gather(
+                    [preds, labels, video_idx, feats]
+                )
             else:
                 preds, labels, video_idx = du.all_gather([preds, labels, video_idx])
         if cfg.NUM_GPUS:
@@ -157,7 +166,11 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
         if not cfg.VIS_MASK.ENABLE:
             # Update and log stats.
             test_meter.update_stats(
-                preds.detach(), labels.detach(), video_idx.detach(), feats.detach() if feats is not None else None, meta
+                preds.detach(),
+                labels.detach(),
+                video_idx.detach(),
+                feats.detach() if feats is not None else None,
+                meta,
             )
         test_meter.log_iter_stats(cur_iter)
 
@@ -187,8 +200,11 @@ def perform_test(test_loader, model, test_meter, cfg, writer=None):
             with pathmgr.open(save_path, "wb") as f:
                 pickle.dump(to_dump, f)
 
-        logger.info("Successfully saved prediction results{} to {}".format(
-            " and features" if test_meter.video_feats is not None else "", save_path))
+        logger.info(
+            "Successfully saved prediction results{} to {}".format(
+                " and features" if test_meter.video_feats is not None else "", save_path
+            )
+        )
 
     return test_meter
 
@@ -225,16 +241,14 @@ def test(cfg):
         flops, params = 0.0, 0.0
         if du.is_master_proc() and cfg.LOG_MODEL_INFO:
             model.eval()
-            flops, params = misc.log_model_info(
-                model, cfg, use_train_input=False
-            )
+            flops, params = misc.log_model_info(model, cfg, use_train_input=False)
 
         if du.is_master_proc() and cfg.LOG_MODEL_INFO:
             misc.log_model_info(model, cfg, use_train_input=False)
         if (
-                cfg.TASK == "ssl"
-                and cfg.MODEL.MODEL_NAME == "ContrastiveModel"
-                and cfg.CONTRASTIVE.KNN_ON
+            cfg.TASK == "ssl"
+            and cfg.MODEL.MODEL_NAME == "ContrastiveModel"
+            and cfg.CONTRASTIVE.KNN_ON
         ):
             train_loader = loader.construct_loader(cfg, "train")
             if hasattr(model, "module"):
@@ -253,9 +267,9 @@ def test(cfg):
             test_meter = AVAMeter(len(test_loader), cfg, mode="test")
         else:
             assert (
-                    test_loader.dataset.num_videos
-                    % (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS)
-                    == 0
+                test_loader.dataset.num_videos
+                % (cfg.TEST.NUM_ENSEMBLE_VIEWS * cfg.TEST.NUM_SPATIAL_CROPS)
+                == 0
             )
             # Create meters for multi-view testing.
             test_meter = TestMeter(
@@ -268,13 +282,11 @@ def test(cfg):
                 len(test_loader),
                 cfg.DATA.MULTI_LABEL,
                 cfg.DATA.ENSEMBLE_METHOD,
-                do_stats=cfg.DO_STATS
+                do_stats=cfg.DO_STATS,
             )
 
         # Set up writer for logging to Tensorboard format.
-        if cfg.TENSORBOARD.ENABLE and du.is_master_proc(
-                cfg.NUM_GPUS * cfg.NUM_SHARDS
-        ):
+        if cfg.TENSORBOARD.ENABLE and du.is_master_proc(cfg.NUM_GPUS * cfg.NUM_SHARDS):
             writer = tb.TensorboardWriter(cfg)
         else:
             writer = None
@@ -293,9 +305,7 @@ def test(cfg):
                 view, cfg.TEST.NUM_SPATIAL_CROPS
             )
         )
-        result_string_views += "_{}a{}" "".format(
-            view, test_meter.stats["top1_acc"]
-        )
+        result_string_views += "_{}a{}" "".format(view, test_meter.stats["top1_acc"])
 
         result_string = (
             "_p{:.2f}_f{:.2f}_{}a{} Top5 Acc: {} MEM: {:.2f} f: {:.4f}"

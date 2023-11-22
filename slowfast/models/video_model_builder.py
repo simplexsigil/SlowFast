@@ -218,9 +218,7 @@ class SlowFast(nn.Module):
         num_groups = cfg.RESNET.NUM_GROUPS
         width_per_group = cfg.RESNET.WIDTH_PER_GROUP
         dim_inner = num_groups * width_per_group
-        out_dim_ratio = (
-            cfg.SLOWFAST.BETA_INV // cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO
-        )
+        out_dim_ratio = cfg.SLOWFAST.BETA_INV // cfg.SLOWFAST.FUSION_CONV_CHANNEL_RATIO
 
         temp_kernel = _TEMPORAL_KERNEL_BASIS[cfg.MODEL.ARCH]
 
@@ -377,9 +375,7 @@ class SlowFast(nn.Module):
                 num_classes=cfg.MODEL.NUM_CLASSES,
                 pool_size=[
                     [
-                        cfg.DATA.NUM_FRAMES
-                        // cfg.SLOWFAST.ALPHA
-                        // pool_size[0][0],
+                        cfg.DATA.NUM_FRAMES // cfg.SLOWFAST.ALPHA // pool_size[0][0],
                         1,
                         1,
                     ],
@@ -404,9 +400,7 @@ class SlowFast(nn.Module):
                 or cfg.MODEL.MODEL_NAME == "ContrastiveModel"
                 else [
                     [
-                        cfg.DATA.NUM_FRAMES
-                        // cfg.SLOWFAST.ALPHA
-                        // pool_size[0][0],
+                        cfg.DATA.NUM_FRAMES // cfg.SLOWFAST.ALPHA // pool_size[0][0],
                         cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][1],
                         cfg.DATA.TRAIN_CROP_SIZE // 32 // pool_size[0][2],
                     ],
@@ -755,9 +749,7 @@ class X3D(nn.Module):
             dim_inner = int(cfg.X3D.BOTTLENECK_FACTOR * dim_out)
 
             n_rep = self._round_repeats(block[0], d_mul)
-            prefix = "s{}".format(
-                stage + 2
-            )  # start w res2 to follow convention
+            prefix = "s{}".format(stage + 2)  # start w res2 to follow convention
 
             s = resnet_helper.ResStage(
                 dim_in=[dim_in],
@@ -766,9 +758,7 @@ class X3D(nn.Module):
                 temp_kernel_sizes=temp_kernel[1],
                 stride=[block[2]],
                 num_blocks=[n_rep],
-                num_groups=[dim_inner]
-                if cfg.X3D.CHANNELWISE_3x3x3
-                else [num_groups],
+                num_groups=[dim_inner] if cfg.X3D.CHANNELWISE_3x3x3 else [num_groups],
                 num_block_temp_kernel=[n_rep],
                 nonlocal_inds=cfg.NONLOCAL.LOCATION[0],
                 nonlocal_group=cfg.NONLOCAL.GROUP[0],
@@ -896,17 +886,13 @@ class MViT(nn.Module):
         if self.use_abs_pos:
             if self.sep_pos_embed:
                 self.pos_embed_spatial = nn.Parameter(
-                    torch.zeros(
-                        1, self.patch_dims[1] * self.patch_dims[2], embed_dim
-                    )
+                    torch.zeros(1, self.patch_dims[1] * self.patch_dims[2], embed_dim)
                 )
                 self.pos_embed_temporal = nn.Parameter(
                     torch.zeros(1, self.patch_dims[0], embed_dim)
                 )
                 if self.cls_embed_on:
-                    self.pos_embed_class = nn.Parameter(
-                        torch.zeros(1, 1, embed_dim)
-                    )
+                    self.pos_embed_class = nn.Parameter(torch.zeros(1, 1, embed_dim))
             else:
                 self.pos_embed = nn.Parameter(
                     torch.zeros(
@@ -932,9 +918,7 @@ class MViT(nn.Module):
         stride_kv = [[] for i in range(cfg.MVIT.DEPTH)]
 
         for i in range(len(cfg.MVIT.POOL_Q_STRIDE)):
-            stride_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_Q_STRIDE[i][
-                1:
-            ]
+            stride_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_Q_STRIDE[i][1:]
             if cfg.MVIT.POOL_KVQ_KERNEL is not None:
                 pool_q[cfg.MVIT.POOL_Q_STRIDE[i][0]] = cfg.MVIT.POOL_KVQ_KERNEL
             else:
@@ -955,17 +939,12 @@ class MViT(nn.Module):
                 cfg.MVIT.POOL_KV_STRIDE.append([i] + _stride_kv)
 
         for i in range(len(cfg.MVIT.POOL_KV_STRIDE)):
-            stride_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KV_STRIDE[
-                i
-            ][1:]
+            stride_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KV_STRIDE[i][1:]
             if cfg.MVIT.POOL_KVQ_KERNEL is not None:
-                pool_kv[
-                    cfg.MVIT.POOL_KV_STRIDE[i][0]
-                ] = cfg.MVIT.POOL_KVQ_KERNEL
+                pool_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = cfg.MVIT.POOL_KVQ_KERNEL
             else:
                 pool_kv[cfg.MVIT.POOL_KV_STRIDE[i][0]] = [
-                    s + 1 if s > 1 else s
-                    for s in cfg.MVIT.POOL_KV_STRIDE[i][1:]
+                    s + 1 if s > 1 else s for s in cfg.MVIT.POOL_KV_STRIDE[i][1:]
                 ]
 
         self.pool_q = pool_q
@@ -978,19 +957,14 @@ class MViT(nn.Module):
         input_size = self.patch_dims
 
         if self.enable_rev:
-
             # rev does not allow cls token
             assert not self.cls_embed_on
 
             self.rev_backbone = ReversibleMViT(cfg, self)
 
-            embed_dim = round_width(
-                embed_dim, dim_mul.prod(), divisor=num_heads
-            )
+            embed_dim = round_width(embed_dim, dim_mul.prod(), divisor=num_heads)
 
-            self.fuse = TwoStreamFusion(
-                cfg.MVIT.REV.RESPATH_FUSE, dim=2 * embed_dim
-            )
+            self.fuse = TwoStreamFusion(cfg.MVIT.REV.RESPATH_FUSE, dim=2 * embed_dim)
 
             if "concat" in self.cfg.MVIT.REV.RESPATH_FUSE:
                 self.norm = norm_layer(2 * embed_dim)
@@ -998,7 +972,6 @@ class MViT(nn.Module):
                 self.norm = norm_layer(embed_dim)
 
         else:
-
             self.blocks = nn.ModuleList()
 
             for i in range(depth):
@@ -1045,8 +1018,7 @@ class MViT(nn.Module):
                 self.blocks.append(attention_block)
                 if len(stride_q[i]) > 0:
                     input_size = [
-                        size // stride
-                        for size, stride in zip(input_size, stride_q[i])
+                        size // stride for size, stride in zip(input_size, stride_q[i])
                     ]
 
                 embed_dim = dim_out
@@ -1136,7 +1108,6 @@ class MViT(nn.Module):
         return names
 
     def _get_pos_embed(self, pos_embed, bcthw):
-
         if len(bcthw) == 4:
             t, h, w = 1, bcthw[-2], bcthw[-1]
         else:
@@ -1150,9 +1121,7 @@ class MViT(nn.Module):
 
         if (p_t, p_h, p_w) != (t, h, w):
             new_pos_embed = F.interpolate(
-                pos_embed[:, :, :]
-                .reshape(1, p_t, p_h, p_w, -1)
-                .permute(0, 4, 1, 2, 3),
+                pos_embed[:, :, :].reshape(1, p_t, p_h, p_w, -1).permute(0, 4, 1, 2, 3),
                 size=(t, h, w),
                 mode="trilinear",
             )
@@ -1190,6 +1159,10 @@ class MViT(nn.Module):
         if isinstance(x, list):
             x = x[0]
         x, bcthw = self.patch_embed(x)
+
+        # Simple addition for MaskDP
+        x = torch.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0)
+
         bcthw = list(bcthw)
         if len(bcthw) == 4:  # Fix bcthw in case of 4D tensor
             bcthw.insert(2, torch.tensor(self.T))
